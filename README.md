@@ -39,7 +39,7 @@ This project explores the usefulness of company website data to evaluate early s
 │
 ├── setup.cfg          <- Configuration file for flake8
 │
-└── text_based_company_success_prediction   <- Source code for use in this project.
+└── src   <- Source code for use in this project.
     │
     ├── __init__.py             <- Makes text_based_company_success_prediction a Python module
     │

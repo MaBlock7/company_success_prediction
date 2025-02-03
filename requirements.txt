@@ -14,4 +14,4 @@ python-dotenv
 scikit-learn
 tqdm
 typer
-git+https://github.com/ChironServices/pocket-knife.git#egg=pocketknife
+git+https://github.com/ChironServices/pocket-knife.git@07cc858b9803328affca0d26c364d001edff4168
