@@ -1,1 +1,1 @@
-from serp_api import GoogleMapsScraper
+from scraper.serp_api import GoogleMapsScraper
