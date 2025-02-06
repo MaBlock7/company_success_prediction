@@ -2,6 +2,7 @@ import re
 import requests
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
 from crawl4ai.async_dispatcher import MemoryAdaptiveDispatcher
+from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from xml.etree import ElementTree
 
 
@@ -149,6 +150,17 @@ class CompanyWebCrawler:
             memory_threshold_percent=70.0,
             check_interval=1.0,
             max_session_permit=10,
+        )
+
+        md_generator = DefaultMarkdownGenerator(
+            options={
+                "ignore_links": True,
+                "ignore_images": True,
+            }
+        )
+
+        config = CrawlerRunConfig(
+            markdown_generator=md_generator
         )
 
         config = CrawlerRunConfig(
