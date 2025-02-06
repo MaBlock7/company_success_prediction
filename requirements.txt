@@ -1,4 +1,5 @@
 black
+crawl4ai
 flake8
 ipython
 isort

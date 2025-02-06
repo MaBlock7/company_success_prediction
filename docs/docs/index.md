@@ -29,4 +29,12 @@ These heuristigs allow us to create an initial mapping of potential URL to compa
 
 ### Company Website Scraping
 
-...
+To scrape the content of a company website, we use the open-source library [crawl4ai](https://crawl4ai.com/mkdocs/), which provides webscraping and content extraction tools optimized for the use of RAG and LLM systems. Based on the URL we fetched from Google Maps, we first try to search for the sitemap of a the website. We extract every URL from all sitemaps we find. If there is no sitemap, we scrape all the internal links from the homepage (base URL).
+
+The extracted URLs are then filtered on a set of simple heuristics which include 1) removing URLs that have a language indicator other than en (English) or de (German), 2) removing URLs that contain an indicator for pages that are of no interest for our purpose, such as 'news', 'terms-of-use', or 'impressum'.
+
+For each of the remaining URLs, we scrape the content and extract it as Markdown optimized for LLMs and the creation of subsequent embeddings. Since many Startups in Switzerland only provide webpages in English, we prioritize English content by passing the Accept-Language parameter to the header, and add German as the second option. In the rare case, where a webpage does neither offer a version in English nor German, we crawl the Content in its original Language. However, By relying on Multi-lingual embeddings, we nevertheless allows us to cluster them, even if the content might be in different languages.
+
+### Retriever
+
+
