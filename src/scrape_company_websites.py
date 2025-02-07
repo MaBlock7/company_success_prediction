@@ -15,7 +15,7 @@ UNWANTED_WORDS = [
     'kontakt',
     'blog',
     'privacy',
-    'privacy-policy'
+    'privacy-policy',
     'datenschutz',
     'datenschutzbestimmungen',
     'disclosure',

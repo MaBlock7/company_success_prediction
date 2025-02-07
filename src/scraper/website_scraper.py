@@ -167,7 +167,11 @@ class CompanyWebCrawler:
                 urls,
                 config=config,
                 dispatcher=dispatcher,
-                headers={'Accept-Language': 'en,de;q=0.5'}  # Prefer English version of website but accept German as an alternative
+                headers={
+                    'Accept-Language': 'en,de;q=0.5',  # Prefer English version of website but accept German as an alternative
+                    'Cookie': 'CookieConsent=true; consent=all',  # Accept all cookies
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                    }
             )
             for result in results:
                 if result.success:
