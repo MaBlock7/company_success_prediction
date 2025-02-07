@@ -152,23 +152,12 @@ class CompanyWebCrawler:
             max_session_permit=10,
         )
 
-        md_generator = DefaultMarkdownGenerator(
-            options={
-                "ignore_links": True,
-                "ignore_images": True,
-            }
-        )
-
-        config = CrawlerRunConfig(
-            markdown_generator=md_generator
-        )
-
         config = CrawlerRunConfig(
             cache_mode=CacheMode.ENABLED,
             scan_full_page=True,
             check_robots_txt=True,
             semaphore_count=3,
-            stream=False
+            stream=False,
         )
 
         successful = {}
