@@ -31,10 +31,25 @@ These heuristigs allow us to create an initial mapping of potential URL to compa
 
 To scrape the content of a company website, we use the open-source library [crawl4ai](https://crawl4ai.com/mkdocs/), which provides webscraping and content extraction tools optimized for the use of RAG and LLM systems. Based on the URL we fetched from Google Maps, we first try to search for the sitemap of a the website. We extract every URL from all sitemaps we find. If there is no sitemap, we scrape all the internal links from the homepage (base URL).
 
-The extracted URLs are then filtered on a set of simple heuristics which include 1) removing URLs that have a language indicator other than en (English) or de (German), 2) removing URLs that contain an indicator for pages that are of no interest for our purpose, such as 'news', 'terms-of-use', or 'impressum'.
+The extracted URLs are then filtered on a set of simple heuristics which include 
+1) removing URLs that have a language indicator other than en (English) or de (German), 
+2) removing URLs that contain an indicator for pages that are of no interest for our purpose, such as 'news', 'terms-of-use', or 'impressum'.
 
 For each of the remaining URLs, we scrape the content and extract it as Markdown optimized for LLMs and the creation of subsequent embeddings. Since many Startups in Switzerland only provide webpages in English, we prioritize English content by passing the Accept-Language parameter to the header, and add German as the second option. In the rare case, where a webpage does neither offer a version in English nor German, we crawl the Content in its original Language. However, By relying on Multi-lingual embeddings, we nevertheless allows us to cluster them, even if the content might be in different languages.
 
-### Retriever
+### Retrieval of Relevant Passages
+
+Our goal is to find relevant information on the company webpage about the following aspects of the company:
+
+1) A description of the economic activity - specifically the products and services offered by the company.
+2) Information about the founders as well as the team.
+3) A statement about the company mission and culture.
+
+Typically, we find these information either on the homepage or dedicated sub-domains such as a product/service page, an about-us page, or similar. Hence, our first approach is to search for a set of typical keywords associated with these domains in the extracted URLs of the website. For example, to find the relevant sections about the team, we search for terms like 'about-us', 'team', 'ueber-uns', etc.
+
+However, some websites do not have a proper naming of the individual sub-domains in their URLs or are so-called single-page websites, which typically load all the content dynamically onto one HTML page - more similar to a paper roll rather than a book with individual pages. For such cases, we use a retriever and reranker on the text-embeddings of the website.
+
+-> To evaluate the approach, use a sample of the website where we can find the relevant pages through a keyword search and then show in what % the relevant pages to a query were found to justify that the approach is working as intended.
+
 
 
