@@ -1,7 +1,7 @@
 # Mapping currently covers 158 countries
 german2alpha2 = {
-    'CHE': 'CH',
-    'Switzerland': 'CH',
+    'che': 'CH',
+    'switzerland': 'CH',
     'aegyptische': 'EG',
     'aegyptischer': 'EG',
     'aethiopische': 'ET',
