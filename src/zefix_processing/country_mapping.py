@@ -1,6 +1,6 @@
 # Mapping currently covers 158 countries
 german2alpha2 = {
-    'che': 'CH',
+    'CH': 'CH',
     'switzerland': 'CH',
     'aegyptische': 'EG',
     'aegyptischer': 'EG',
@@ -428,7 +428,7 @@ german2alpha2 = {
 
 # In French, the origin can be given as the country name (e.g. de France) or as an adjective (e.g. française)
 french2alpha2 = {
-    'CHE': 'CH',
+    'CH': 'CH',
     'suisse': 'CH',
     'albanie': 'AL',
     'andorre': 'AD',
