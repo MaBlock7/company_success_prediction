@@ -8,7 +8,7 @@ loguru
 matplotlib
 mkdocs
 notebook
-numpy
+numpy<2
 pandas
 pip
 python-dotenv
