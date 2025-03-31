@@ -2,6 +2,7 @@ country_names_to_alpha2 = {
     'CH': 'CH',
     'Switzerland': 'CH',
     'unbekannte Staatsangehörigkeit': 'ZZ',
+    'unbekannte': 'ZZ',
     'unbekannt': 'ZZ',
     'staatenlos': 'ZZ',
     'apatride': 'ZZ',
@@ -30,6 +31,7 @@ country_names_to_alpha2 = {
     'ARE': 'AE',
     'Vereinigte Arabische Emirate': 'AE',  # German
     'Émirats arabes unis': 'AE',  # French
+    'Emirates Arabes Unis': 'AE',
     'Emirati Arabi Uniti': 'AE',  # Italian
     'Vereinigten Arabischen Emirate': 'AE',
     'émirats arabes unis': 'AE',
@@ -54,6 +56,7 @@ country_names_to_alpha2 = {
     'ATG': 'AG',
     'Antigua und Barbuda': 'AG',  # German
     'Antigua-et-Barbuda': 'AG',  # French
+    'Antigua et Barbuda': 'AG',  # French
     'Antigua e Barbuda': 'AG',  # Italian
     'antiguanische': 'AG',
     'antiguanischer': 'AG',
@@ -136,6 +139,7 @@ country_names_to_alpha2 = {
     'AUT': 'AT',
     'Österreich': 'AT',  # German
     'Autriche': 'AT',  # French
+    'Autrich': 'AT',  # French
     'Austria': 'AT',  # Italian
     'österreichische': 'AT',
     'österreichischer': 'AT',
@@ -145,6 +149,8 @@ country_names_to_alpha2 = {
     'austriaca': 'AT',
 
     'austricao': 'AT',  # Typo
+    'österreischische': 'AT',  # Typo
+    'cösterreichischer': 'AT',  # Typo
 
     # AU
     'AUS': 'AU',
@@ -182,12 +188,16 @@ country_names_to_alpha2 = {
     'azerbaigiana': 'AZ',
     'azerbaigiano': 'AZ',
 
+    'Azerbaijan': 'AZ',  # Typo
+
     # BA
     'BIH': 'BA',
     'Bosnien': 'BA',  # German
     'Bosnien und Herzegowina': 'BA',  # German
+    'Bosnien-Herzegowina': 'BA',
     'Bosnie': 'BA',  # French
     'Bosnie-Herzégovine': 'BA',  # French
+    'Bosnie et Herzégovine': 'BA',  # French
     'Bosnia': 'BA',  # Italian
     'Bosnia ed Erzegovina': 'BA',  # Italian
     'Bosnia Erzegovina': 'BA',  # Italian
@@ -204,7 +214,10 @@ country_names_to_alpha2 = {
     'erzegovino': 'BA',
     'bosniaco-erzegovinese': 'BA',
     'bosniaca-erzegovinese': 'BA',
+    'bosniaco-erzegovino': 'BA',
+    'bosniaca-erzegovina': 'BA',
 
+    'bosnisc-herzegowinischer': 'BA',  # Typo
     # BB
     'BRB': 'BB',
     'Barbados': 'BB',  # German/Italian
@@ -381,12 +394,15 @@ country_names_to_alpha2 = {
     'botswanaise': 'BW',
     'botsuano': 'BW',
     'botsuana': 'BW',
+    
+    'botsuanische': 'BW',
+    'botsuanischer': 'BW',
 
     # BY
     'BLR': 'BY',
     'Belarus': 'BY',  # German
     'Biélorussie': 'BY',  # French
-    'Bélarus', 'BY',  # French
+    'Bélarus': 'BY',  # French
     'Bielorussia': 'BY',  # Italian
     'belarussische': 'BY',
     'belarussischer': 'BY',
@@ -430,7 +446,10 @@ country_names_to_alpha2 = {
     # CD
     'COD': 'CD',
     'Demokratische Republik Kongo': 'CD',  # German
+    'Demokratischen Republik Kongo ( Kinshasa )': 'CD',
     'République démocratique du Congo': 'CD',  # French
+    'Congo ( Kinshasa )': 'CD',  # French
+    'Congo': 'CD',
     'Repubblica Democratica del Congo': 'CD',  # Italian
     'congolais (DR)': 'CD',
     'congolaise (DR)': 'CD',
@@ -522,12 +541,17 @@ country_names_to_alpha2 = {
     'China': 'CN',  # German
     'Volksrepublik China': 'CN',
     'Chine': 'CN',  # French
+    'République populaire de Chine': 'CN',
     'Cina': 'CN',  # Italian
     'chinesische': 'CN',
     'chinesischer': 'CN',
     'chinois': 'CN',
     'chinoise': 'CN',
     'cinese': 'CN',
+    
+    'Tibet': 'CN',
+    'tibetische': 'CN',
+    'tibetischer': 'CN',
 
     # CO
     'COL': 'CO',
@@ -632,6 +656,8 @@ country_names_to_alpha2 = {
     'tedesca': 'DE',
 
     'germaico': 'DE',  # Typo
+    'deutcher': 'DE',  # Typo
+    'deuscher': 'DE',  # Typo
 
     # DJ
     'DJI': 'DJ',
@@ -640,6 +666,8 @@ country_names_to_alpha2 = {
     'Gibuti': 'DJ',  # Italian
     'djiboutische': 'DJ',
     'djiboutischer': 'DJ',
+    'dschibutische': 'DJ',
+    'dschibutischer': 'DJ',
     'djiboutien': 'DJ',
     'djiboutienne': 'DJ',
     'gibutiano': 'DJ',
@@ -667,6 +695,7 @@ country_names_to_alpha2 = {
     'DOM': 'DO',
     'Dominikanische Republik': 'DO',  # German
     'République dominicaine': 'DO',  # French
+    'Républicaine dominicaine': 'DO',
     'Repubblica Dominicana': 'DO',  # Italian
     'dominikanische': 'DO',
     'dominikanischer': 'DO',
@@ -676,6 +705,9 @@ country_names_to_alpha2 = {
     'dominicana': 'DO',
     'domenicano': 'DO',
     'domenicana': 'DO',
+    
+    'domenikanische': 'DO',
+    'domenikanischer': 'DO',
 
     # DZ
     'DZA': 'DZ',
@@ -833,6 +865,8 @@ country_names_to_alpha2 = {
     'française': 'FR',
     'francese': 'FR',
 
+    'französiche': 'FR',  # Typo
+    'französicher': 'FR',  # Typo
     # GA
     'GAB': 'GA',
     'Gabun': 'GA',  # German
@@ -849,16 +883,23 @@ country_names_to_alpha2 = {
     'Vereinigtes Königreich': 'GB',  # German
     'Grossbritannien': 'GB',  # German
     'Royaume-Uni': 'GB',  # French
+    'Royaume Uni': 'GB',
     'Royaume-Unis': 'GB',
+    'Angleterre': 'GB',
     'Grande-Bretagne': 'GB',
     'Regno Unito': 'GB',  # Italian
     'britische': 'GB',
     'britischer': 'GB',
+    'grossbritannische': 'GB',
+    'grossbritannischer': 'GB',
     'britannique': 'GB',
     'britannico': 'GB',
     'britannica': 'GB',
     'brittanico': 'GB',
     'brittanica': 'GB',
+    
+    'écossaise': 'GB',
+    'écossais': 'GB',
 
     # GD
     'GRD': 'GD',
@@ -938,6 +979,7 @@ country_names_to_alpha2 = {
     # GN
     'GIN': 'GN',
     'Guinea': 'GN',  # German/French/Italian
+    'Guinée': 'GN',  # French
     'guineische': 'GN',
     'guineischer': 'GN',
     'guinéen': 'GN',
@@ -979,6 +1021,7 @@ country_names_to_alpha2 = {
     'SGS': 'GS',
     'Südgeorgien und die Südlichen Sandwichinseln': 'GS',  # German
     'Géorgie du Sud-et-les îles Sandwich du Sud': 'GS',  # French
+    'Géorgie du Sud et les îles Sandwich du Sud': 'GS',  # French
     'Georgia del Sud e isole Sandwich meridionali': 'GS',  # Italian
 
     # GT
@@ -1025,6 +1068,7 @@ country_names_to_alpha2 = {
     'HMD': 'HM',
     'Heard und McDonaldinseln': 'HM',  # German
     'Îles Heard-et-MacDonald': 'HM',  # French
+    'Îles Heard et MacDonald': 'HM',  # French
     'Isole Heard e McDonald': 'HM',  # Italian
 
     # HN
@@ -1074,6 +1118,7 @@ country_names_to_alpha2 = {
     'IDN': 'ID',
     'Indonesien': 'ID',  # German
     'Indonésie': 'ID',  # French
+    'la République Indonésie': 'ID',
     'Indonesia': 'ID',  # Italian
     'indonesische': 'ID',
     'indonesischer': 'ID',
@@ -1242,6 +1287,8 @@ country_names_to_alpha2 = {
     'Kirghizistan': 'KG',  # French/Itanian
     'kirgisische': 'KG',
     'kirgisischer': 'KG',
+    'kirgistanische': 'KG',
+    'kirgistanischer': 'KG',
     'kirghize': 'KG',
     'kirghiso': 'KG',
     'kirghisa': 'KG',
@@ -1282,8 +1329,11 @@ country_names_to_alpha2 = {
     # KN
     'KNA': 'KN',
     'Saint Kitts und Nevis': 'KN',  # German
+    'Saint-Kitts-et-Nevis': 'KN',  # French
     'Saint-Christophe-et-Niévès': 'KN',  # French
+    'Saint-Christophe et Niévès': 'KN',  # French
     'Saint-Christophe-et-Nevis': 'KN',  # French
+    'Saint-Christophe et Nevis': 'KN',  # French
     'Saint Kitts e Nevis': 'KN',  # Italian
     'St. Kitts': 'KN',
     'Nevis': 'KN',
@@ -1312,6 +1362,10 @@ country_names_to_alpha2 = {
     'Südkorea': 'KR',  # German
     'Republik Korea': 'KR',  # German
     'Corée du Sud': 'KR',  # French
+    'République de Corée': 'KR',  # French
+    'République Corée': 'KR',
+    'Corée ( Sud )': 'KR',
+    'Coréen Sud': 'KR',
     'Corea del Sud': 'KR',  # Italian
     'koreanische': 'KR',  # Per assumption South Korea
     'koreanischer': 'KR',
@@ -1319,6 +1373,8 @@ country_names_to_alpha2 = {
     'südkoreanischer': 'KR',
     'sud-coréen': 'KR',
     'sud-coréenne': 'KR',
+    'coréen sud': 'KR',
+    'coréenne sud': 'KR',
     'coréen': 'KR',
     'coréenne': 'KR',
     'coreano': 'KR',
@@ -1340,6 +1396,7 @@ country_names_to_alpha2 = {
     # KY
     'CYM': 'KY',
     'Caymaninseln': 'KY',  # German
+    'Kaimaninseln': 'KY',
     'Îles Caïmans': 'KY',  # French
     'Isole Cayman': 'KY',  # Italian
 
@@ -1347,9 +1404,12 @@ country_names_to_alpha2 = {
     'KAZ': 'KZ',
     'Kasachstan': 'KZ',  # German
     'Kazakhstan': 'KZ',  # French
+    'République Kazakhstan': 'KZ',  # French
     'Kazakistan': 'KZ',  # Italian
     'kasachische': 'KZ',
     'kasachischer': 'KZ',
+    'kasachstanische': 'KZ',
+    'kasachstanischer': 'KZ',
     'kazakh': 'KZ',
     'kazakhe': 'KZ',
     'kazakhstanaise': 'KZ',
@@ -1404,6 +1464,7 @@ country_names_to_alpha2 = {
     # LK
     'LKA': 'LK',
     'Sri Lanka': 'LK',  # German/French/Italian
+    'Sri-Lanka': 'LK',
     'sri-lankische': 'LK',
     'sri-lankischer': 'LK',
     'srilankische': 'LK',
@@ -1458,6 +1519,9 @@ country_names_to_alpha2 = {
     'luxembourgeoise': 'LU',
     'lussemburghese': 'LU',
     'luxemburghese': 'LU',
+
+    'luxembourgische': 'LU',  # Typo
+    'luxembourgischer': 'LU',  # Typo
 
     # LV
     'LVA': 'LV',
@@ -1531,16 +1595,33 @@ country_names_to_alpha2 = {
     'Monténégro': 'ME',  # French
     'montenegrinische': 'ME',
     'montenegrinischer': 'ME',
-    'serbisch-montenegrinische': 'ME',
-    'serbisch-montenegrinischer': 'ME',
     'monténégrin': 'ME',
     'monténégrine': 'ME',
     'montenegrino': 'ME',
     'montenegrina': 'ME',
-    'serbo-montenegrino': 'ME',
-    'serba-montenegrina': 'ME',
-    'serbo e montenegrino': 'ME',
-    'serba e montenegrina': 'ME',
+
+    'Serbien-Montenegro': 'RS-ME',
+    'Serbie-Monténégro': 'RS-ME',
+    'Serbia-Montenegro': 'RS-ME',
+    'serbisch-montenegrinische': 'RS-ME',
+    'serbisch-montenegrinischer': 'RS-ME',
+    'serbo-montenegrino': 'RS-ME',
+    'serba-montenegrina': 'RS-ME',
+    'serbo e montenegrino': 'RS-ME',
+    'serba e montenegrina': 'RS-ME',
+
+    'Jugoslavien': 'RS-ME',  # German
+    'Bundesrepublik Jugoslawien': 'RS-ME',
+    'Ex-Jugoslawien': 'RS-ME',
+    'Yougoslavie': 'RS-ME',  # French
+    'Jugoslavia': 'RS-ME',  # Italian
+    'jugoslawische': 'RS-ME',
+    'jugoslawischer': 'RS-ME',
+    'yougoslave': 'RS-ME',
+    'jugoslava': 'RS-ME',
+    'jugoslavo': 'RS-ME',
+    'iugoslava': 'RS-ME',
+    'iugoslavo': 'RS-ME',
 
     # MF
     'MAF': 'MF',
@@ -1654,6 +1735,9 @@ country_names_to_alpha2 = {
     'mauritano': 'MR',
     'mauritana': 'MR',
 
+    'mauretanische': 'MR',  # Typo
+    'mauretanischer': 'MR',  # Typo
+
     # MS
     'MSR': 'MS',
     'Montserrat': 'MS',  # German/French/Italian
@@ -1672,6 +1756,8 @@ country_names_to_alpha2 = {
     'MUS': 'MU',
     'Mauritius': 'MU',  # German
     'Maurice': 'MU',  # French
+    'Ile Maurice': 'MU',
+    'République Maurice': 'MU',
     'Maurizio': 'MU',  # Italian
     'mauritische': 'MU',
     'mauritischer': 'MU',
@@ -1957,6 +2043,7 @@ country_names_to_alpha2 = {
     'SPM': 'PM',
     'Saint-Pierre und Miquelon': 'PM',  # German
     'Saint-Pierre-et-Miquelon': 'PM',  # French
+    'Saint-Pierre et Miquelon': 'PM',  # French
     'Saint-Pierre e Miquelon': 'PM',  # Italian
 
     # PN
@@ -2070,6 +2157,7 @@ country_names_to_alpha2 = {
     'RUS': 'RU',
     'Russland': 'RU',  # German
     'Russie': 'RU',  # French
+    'Fédération Russie': 'RU',
     'Russia': 'RU',  # Italian
     'russische': 'RU',
     'russischer': 'RU',
@@ -2094,6 +2182,8 @@ country_names_to_alpha2 = {
     'Arabia Saudita': 'SA',  # Italian
     'saudische': 'SA',
     'saudischer': 'SA',
+    'saudiarabische': 'SA',
+    'saudiarabischer': 'SA',
     'saudi-arabische': 'SA',
     'saudi-arabischer': 'SA',
     'saoudien': 'SA',
@@ -2192,6 +2282,8 @@ country_names_to_alpha2 = {
     'Slovacchia': 'SK',  # Italian
     'slowakische': 'SK',
     'slowakischer': 'SK',
+    'slovakische': 'SK',
+    'slovakischer': 'SK',
     'slovaque': 'SK',
     'slovacco': 'SK',
     'slovacca': 'SK',
@@ -2209,6 +2301,8 @@ country_names_to_alpha2 = {
     'SMR': 'SM',
     'San Marino': 'SM',  # German/Italian
     'Saint-Marin': 'SM',  # French
+    'san-marinesische': 'SM',
+    'san-marinesischer': 'SM',
     'sammarinese': 'SM',
 
     # SN
@@ -2249,11 +2343,14 @@ country_names_to_alpha2 = {
     'Sud Sudan': 'SS',  # Italian
     'südsudanesische': 'SS',
     'südsudanesischer': 'SS',
+    'soudanais sud': 'SS',
+    'soudanaise sud': 'SS',
 
     # ST
     'STP': 'ST',
     'São Tomé und Príncipe': 'ST',  # German
     'Sao Tomé-et-Principe': 'ST',  # French
+    'Sao Tomé et Principe': 'ST',  # French
     'São Tomé e Príncipe': 'ST',  # Italian
 
     # SV
@@ -2298,6 +2395,7 @@ country_names_to_alpha2 = {
     'TCA': 'TC',
     'Turks- und Caicosinseln': 'TC',  # German
     'Îles Turques-et-Caïques': 'TC',  # French
+    'Îles Turques et Caïques': 'TC',  # French
     'Isole Turks e Caicos': 'TC',  # Italian
 
     # TD
@@ -2430,6 +2528,7 @@ country_names_to_alpha2 = {
     'Trinidad': 'TT',
     'Tobago': 'TT',
     'Trinité-et-Tobago': 'TT',  # French
+    'Trinité et Tobago': 'TT',  # French
     'Trinidad e Tobago': 'TT',  # Italian
     'trinidadische': 'TT',
     'trinidadischer': 'TT',
@@ -2459,6 +2558,8 @@ country_names_to_alpha2 = {
     'Taïwan': 'TW',  # French
     'taiwanische': 'TW',
     'taiwanischer': 'TW',
+    'taiwanesische': 'TW',
+    'taiwanesischer': 'TW',
     'taïwanais': 'TW',
     'taïwanaise': 'TW',
     'taiwanese': 'TW',
@@ -2562,6 +2663,7 @@ country_names_to_alpha2 = {
     'VCT': 'VC',
     'Saint Vincent und die Grenadinen': 'VC',  # German
     'Saint-Vincent-et-les-Grenadines': 'VC',  # French
+    'Saint-Vincent et les-Grenadines': 'VC',  # French
     'Saint Vincent e Grenadine': 'VC',  # Italian
 
     # VE
@@ -2614,6 +2716,7 @@ country_names_to_alpha2 = {
     'WLF': 'WF',
     'Wallis und Futuna': 'WF',  # German
     'Wallis-et-Futuna': 'WF',  # French
+    'Wallis et Futuna': 'WF',  # French
     'Wallis e Futuna': 'WF',  # Italian
 
     # WS
@@ -2633,6 +2736,10 @@ country_names_to_alpha2 = {
     'Kossovo': 'XK',  # Italian
     'kosovarische': 'XK',
     'kosovarischer': 'XK',
+    'kosova-albanische': 'XK',
+    'kosova-albanischer': 'XK',
+    'kosovo-albanische': 'XK',
+    'kosovo-albanischer': 'XK',
     'kosovar': 'XK',
     'kosovare': 'XK',
     'kosovaro': 'XK',
