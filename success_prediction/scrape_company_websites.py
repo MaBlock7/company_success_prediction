@@ -1,5 +1,7 @@
 import asyncio
+import gzip
 import json
+from crawl4ai import AsyncWebCrawler
 from scraper import CompanyWebCrawler
 from config import RAW_DATA_DIR
 
@@ -11,15 +13,18 @@ UNWANTED_KEYWORDS = [
     'imprint',
     'blog',
     'privacy',
-    'privacy-policy',
     'disclosure',
+    'legal',
     'shop',
     'store',
+    'career',
+    'jobs',
 
     'neuigkeiten',
     'impressum',
     'datenschutz',
     'datenschutzbestimmungen',
+    'karriere',
 
     'nouvelles',               # news
     'conditions-generales',    # terms and conditions
@@ -30,6 +35,7 @@ UNWANTED_KEYWORDS = [
     'divulgation',             # disclosure
     'boutique',                # shop
     'magasin',                 # store
+    'carriere',
 
     'notizie',                 # news
     'termini-e-condizioni',
@@ -40,7 +46,8 @@ UNWANTED_KEYWORDS = [
     'politica-sulla-privacy',
     'divulgazione',
     'negozio',
-    'store'
+    'store',
+    'carriera',
 ]
 
 PRODUCT_KEYWORDS = [
@@ -58,13 +65,13 @@ PRODUCT_KEYWORDS = [
 ]
 
 ABOUT_TEAM_KEYWORDS = [
-    "about", "team", "founders", "people", "staff", "who-we-are", "company", "history",
+    "about", "team", "founder", "people", "staff", "who-we-are", "company", "history",
 
-    "ueber-uns", "gruender", "menschen", "mitarbeiter", "wer-wir-sind", "unternehmen", "geschichte",
+    "ueber-uns", "uber-uns", "gruender", "menschen", "mitarbeiter", "wer-wir-sind", "unternehmen", "geschichte",
 
-    "a-propos", "equipe", "fondateurs", "personnes", "personnel", "qui-nous-sommes", "entreprise", "histoire",
+    "a-propos", "equipe", "fondateur", "personnes", "personnel", "qui-nous-sommes", "entreprise", "histoire",
 
-    "chi-siamo", "fondatori", "persone", "staff", "azienda", "storia"
+    "chi-siamo", "fondator", "persone", "staff", "azienda", "storia"
 ]
 
 CONTACT_KEYWORDS = [
@@ -72,37 +79,63 @@ CONTACT_KEYWORDS = [
 ]
 
 VALUES_KEYWORDS = [
-    "values", "ethics", "mission", "vision", "purpose", "what-we-believe", "culture",
+    "values", "goal", "mission", "vision", "strategy", "purpose", "what-we-believe", "culture",
     "principles", "commitment", "beliefs",
 
-    "werte", "ethik", "zweck", "glaubenssaetze", "kultur",
+    "werte", "ziel", "zweck", "glaubenssaetze", "strategie", "kultur",
     "prinzipien", "engagement", "ueberzeugungen",
 
-    "valeurs", "ethique", "but", "ce-que-nous-croyons", "culture",
+    "valeurs", "but", "ce-que-nous-croyons", "culture",
     "principes", "engagement", "convictions",
 
-    "valori", "etica", "missione", "visione", "scopo", "cosa-crediamo", "cultura",
+    "valori", "obiettivo", "missione", "visione", "strategia", "scopo", "cosa-crediamo", "cultura",
     "principi", "impegno", "credenze"
 ]
 
 
 def load_data():
-    return {'1433629': 'https://www.chiron-services.ch/', '1417133': 'https://www.adresta.ch/'}
+    return {
+        '1433629': 'https://www.chiron-services.ch',
+        '1417133': 'https://www.adresta.ch'
+    }
 
 
 def save_json(ehraid: str, results: dict):
-    with open(RAW_DATA_DIR / f'{ehraid}.json', 'w', encoding='utf-8') as f:
-        json.dump(results, f, ensure_ascii=False, indent=4)
+    with gzip.open(RAW_DATA_DIR / f'{ehraid}.json.gz', 'wt', encoding='utf-8') as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
 
 
-async def process_base_url(cwc, ehraid, base_url):
-    """Process a single base URL asynchronously."""
-    results = await cwc.crawl(base_url)
+async def process_base_url(cwc, ehraid, base_url, max_depth: int = 1):
+    try:
+        try:
+            urls = await asyncio.wait_for(asyncio.to_thread(cwc.get_urls, base_url), timeout=10)
+        except asyncio.TimeoutError:
+            print(f"[Timeout] Sitemap fetch for {base_url} took too long.")
+            urls = []
 
-    final_results = {ehraid: results}
+        async with AsyncWebCrawler() as crawler:
+            if not urls:
+                urls, scraped = [base_url], set()
+                for _ in range(max_depth):
+                    to_scrape = [url for url in urls if url not in scraped]
+                    if not to_scrape:
+                        break
+                    temp_results = await cwc.crawl(crawler, to_scrape)
 
-    # Save results asynchronously
-    await asyncio.to_thread(save_json, ehraid, final_results)
+                scraped.update(to_scrape)
+
+                for content in temp_results.values():
+                    for link in content.get('links', {}).get('internal', []):
+                        href = link.get('href').rstrip('/')
+                        if href and ('www.' in href) and (href not in urls):
+                            urls.append(href)
+
+            filtered_urls = cwc.filter_urls(urls, min_pages=1, max_pages=5)
+            results = await cwc.crawl(crawler, filtered_urls)
+            await asyncio.to_thread(save_json, ehraid, {ehraid: results})
+
+    except Exception as e:
+        print(f"Error occurred during processing of {base_url}: {e}")
 
 
 async def main():
@@ -114,10 +147,7 @@ async def main():
     )
     ehraid2url = load_data()
 
-    # Create async tasks for all base URLs
     tasks = [process_base_url(cwc, ehraid, base_url) for ehraid, base_url in ehraid2url.items()]
-
-    # Run all tasks concurrently
     await asyncio.gather(*tasks)
 
 

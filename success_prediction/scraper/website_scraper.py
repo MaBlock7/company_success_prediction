@@ -1,56 +1,10 @@
 import re
 import requests
 from datetime import datetime
-from functools import lru_cache
-from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode, LXMLWebScrapingStrategy
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
 from crawl4ai.async_dispatcher import MemoryAdaptiveDispatcher
-from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
-from crawl4ai.deep_crawling import BestFirstCrawlingStrategy
-from crawl4ai.deep_crawling.scorers import URLScorer
 from xml.etree import ElementTree
 from urllib.parse import urlparse
-
-
-class WantedUnwantedRelevanceScorer(URLScorer):
-    __slots__ = ('_weight', '_stats', '_wanted_keywords', '_unwanted_keywords', '_case_sensitive')
-
-    def __init__(
-            self,
-            wanted_keywords: list[str],
-            unwanted_keywords: list[str],
-            weight: float = 1.0,
-            case_sensitive: bool = False
-        ):
-        super().__init__(weight=weight)
-        self._case_sensitive = case_sensitive
-
-        # Pre-process keywords once
-        self._wanted_keywords = [k if case_sensitive else k.lower() for k in wanted_keywords]
-        self._unwanted_keywords = [k if case_sensitive else k.lower() for k in unwanted_keywords]
-
-    @lru_cache(maxsize=10000)
-    def _url_bytes(self, url: str) -> bytes:
-        """Cache decoded URL bytes"""
-        return url.encode('utf-8') if self._case_sensitive else url.lower().encode('utf-8')
-
-    def _calculate_score(self, url: str) -> float:
-        """Fast string matching without regex or byte conversion"""
-        parsed = urlparse(url)
-        path = parsed.path
-
-        if not self._case_sensitive:
-            path = path.lower()
-
-        wanted_matches = sum(1 for k in self._wanted_keywords if k in path)
-        unwanted_matches = sum(1 for k in self._unwanted_keywords if k in path)
-
-        if wanted_matches and unwanted_matches:
-            return 0.25
-        if unwanted_matches:
-            return 0.0
-        if wanted_matches:
-            return 1.0
-        return 0.5
 
 
 class CompanyWebCrawler:
@@ -77,43 +31,24 @@ class CompanyWebCrawler:
         >>> filtered_urls = crawler.filter_urls(urls)
         >>> results = asyncio.run(crawler.crawl(filtered_urls))
     """
-    def __init__(self, wanted_keywords: list[str], unwanted_keywords: list[str] = [], lang_exceptions: list[str] = ['de', 'fr', 'it', 'en']):
-        self.unwanted_words_pattern = re.compile(rf"/({'|'.join(map(re.escape, unwanted_keywords))})(?:/|$)")
+    def __init__(
+        self,
+        wanted_keywords: list[str] = [],
+        unwanted_keywords: list[str] = [],
+        lang_exceptions: list[str] = ['en']
+    ):
+        self.unwanted_keywords_pattern = re.compile(rf"/({'|'.join(map(re.escape, unwanted_keywords))})(?:/|$)")
         self.lang_pattern = re.compile(r"/([a-z]{2})/")
         self.lang_exceptions = lang_exceptions
         self.current_date = datetime.today().strftime('%Y-%m-%d')
 
-        scorer = WantedUnwantedRelevanceScorer(
-            wanted_keywords=wanted_keywords,
-            unwanted_keywords=unwanted_keywords
-        )
-
-        strategy = BestFirstCrawlingStrategy(
-            max_depth=2,
-            include_external=False,
-            url_scorer=scorer,
-            max_pages=15,
-        )
-
-        self.dispatcher = MemoryAdaptiveDispatcher(
-            memory_threshold_percent=70.0,
-            check_interval=1.0,
-            max_session_permit=10,
-        )
-
-        self.config = CrawlerRunConfig(
-            deep_crawl_strategy=strategy,
-            scraping_strategy=LXMLWebScrapingStrategy(),
-            markdown_generator=DefaultMarkdownGenerator(),
-            stream=True,
-            scan_full_page=True,
-            check_robots_txt=True,
-        )
+        self._wanted_keywords = [k.lower() for k in wanted_keywords]
+        self._unwanted_keywords = [k.lower() for k in unwanted_keywords]
 
     @staticmethod
     def _create_sitemap_url(base_url: str) -> str:
         """Adds sitemap subdomain to a base url."""
-        return f"{base_url}/sitemap.xml"
+        return f"{base_url.rstrip('/')}/sitemap.xml"
 
     @staticmethod
     def _detect_namespace(root: ElementTree.Element) -> dict[str, str]:
@@ -182,24 +117,41 @@ class CompanyWebCrawler:
             print(f"Unexpected error occured for {base_url}: {e}")
             return []
 
-    def _filter_unwanted_languages(self, urls: list[str]) -> list[str]:
+    def _filter_unwanted_languages(self, urls: list[str], min_pages) -> list[str]:
         """Removes URLs that indicate a foreign language except for languages
         that are specified in the lang_exceptions list."""
         filtered_urls = []
         for url in urls:
-            match = self.lang_pattern.search(url)
+            match = self.lang_pattern.search(url.lower())
             if match:
                 if match.group(1) in self.lang_exceptions:
                     filtered_urls.append(url)
             else:
                 filtered_urls.append(url)
-        return filtered_urls
+        return urls if len(filtered_urls) < min_pages else filtered_urls
 
-    def _filter_unwanted_words(self, urls: list[str]) -> list[str]:
-        """Removes URLs that contain unwanted words as specified in the unwanted_words list."""
-        return [url for url in urls if not self.unwanted_words_pattern.search(url)]
+    def _score_url(self, url: str):
+        path = urlparse(url).path
+        depth = len([p for p in path.split('/') if p])
+        scaling_factor = 1 / depth if depth else 1  # Prioritize shallow paths
 
-    def filter_urls(self, urls: list[str]) -> list[str]:
+        wanted_matches = any(k in path for k in self._wanted_keywords)
+        unwanted_matches = any(k in path for k in self._unwanted_keywords)
+
+        if wanted_matches and unwanted_matches:
+            return 0.25 * scaling_factor
+        if unwanted_matches:
+            return 0.0
+        if wanted_matches:
+            return 1.0 * scaling_factor
+        return 0.5 * scaling_factor
+
+    def _rank_urls(self, urls: list[str]):
+        """Sort URLs by relevance score in descending order."""
+        sorted_urls = sorted(((url, self._score_url(url)) for url in urls), key=lambda x: x[1], reverse=True)
+        return [url for url, score in sorted_urls if score > 0]
+
+    def filter_urls(self, urls: list[str], min_pages: int = 10, max_pages: int = 15) -> list[str]:
         """Filters unwanted URLs based on language and specific keywords.
 
         Args:
@@ -208,11 +160,12 @@ class CompanyWebCrawler:
         Returns:
             list[str]: A filtered list of URLs with unwanted entries removed.
         """
-        filtered_urls = self._filter_unwanted_languages(urls)
-        filtered_urls = self._filter_unwanted_words(filtered_urls)
-        return filtered_urls
+        urls = [url for url in urls if '#' not in url]
+        filtered_urls = self._filter_unwanted_languages(urls, min_pages)
+        ranked_urls = self._rank_urls(filtered_urls)
+        return ranked_urls[:max_pages]
 
-    async def crawl(self, base_url: str):
+    async def crawl(self, crawler: AsyncWebCrawler, urls: list[str]):
         """Asynchronously crawls the given list of URLs.
 
         Args:
@@ -222,30 +175,48 @@ class CompanyWebCrawler:
             dict[str, dict]: A dictionary containing crawl results, including extracted content and links.
         """
         successful = {}
-        async with AsyncWebCrawler() as crawler:
-            async for result in await crawler.arun(
-                base_url,
-                config=self.config,
-                dispatcher=self.dispatcher,
-                headers={
-                    # 'Accept-Language': 'en,de;q=0.5',  # Prefer English version of website but accept German as an alternative
-                    'Cookie': 'CookieConsent=true; consent=all',  # Accept all cookies
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                    }
-            ):
-                if result.success:
-                    score = result.metadata.get('score', 0)
-                    if score > 0:
-                        successful[result.url] = {
-                            'markdown': result.markdown,
-                            'links': result.links,
-                            'date': self.current_date,
-                            'score': score,
-                            'depth': result.metadata.get('depth', 0)
-                        }
-                elif result.status_code == 403 and "robots.txt" in result.error_message:
-                    successful[result.url] = {'status_code': result.status_code, 'error_message': result.error_message}
-                else:
-                    successful[result.url] = {'status_code': result.status_code, 'error_message': result.error_message}
+
+        dispatcher = MemoryAdaptiveDispatcher(
+            memory_threshold_percent=70.0,
+            check_interval=1.0,
+            max_session_permit=10,
+        )
+
+        config = CrawlerRunConfig(
+            # markdown_generator=DefaultMarkdownGenerator(
+            #     options={
+            #         'ignore_images': True,
+            #         'ignore_links': True
+            #     }
+            # ),
+            scan_full_page=True,
+            check_robots_txt=True,
+            semaphore_count=3,
+            stream=False,
+        )
+
+        results = await crawler.arun_many(
+            urls,
+            config=config,
+            dispatcher=dispatcher,
+            headers={
+                'Accept-Language': 'en,de;q=0.8,fr;q=0.6,it;q=0.4',  # Prefer English version of website but accept German, French, or Italian as an alternative
+                'Cookie': 'CookieConsent=true; consent=all',  # Accept all cookies
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+        )
+        for result in results:
+            if result.success:
+                successful[result.url] = {
+                    'status_code': result.status_code,
+                    'markdown': result.markdown,
+                    'external_links': result.links.get('external', []),
+                    'date': self.current_date,
+                }
+            else:
+                successful[result.url] = {
+                    'status_code': result.status_code,
+                    'error_message': result.error_message
+                }
 
         return successful
