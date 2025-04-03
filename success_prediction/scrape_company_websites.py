@@ -99,9 +99,14 @@ def load_data():
         '1417133': 'https://www.adresta.ch'
     }
 
-
+"""
 def save_json(ehraid: str, results: dict):
     with gzip.open(RAW_DATA_DIR / f'{ehraid}.json.gz', 'wt', encoding='utf-8') as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
+"""
+
+def save_json(ehraid: str, results: dict):
+    with open(RAW_DATA_DIR / f'{ehraid}.json', 'w', encoding='utf-8') as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
 
 

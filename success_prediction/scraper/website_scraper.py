@@ -156,6 +156,9 @@ class CompanyWebCrawler:
 
         Args:
             urls (list[str]): A list of URLs to be filtered.
+            min_pages (int): If less than min_pages remain after filtering pages 
+                with an explicitly set language in the URL, no pages are removed.
+            max_pages (int): The maximum number of pages that are downloaded.
 
         Returns:
             list[str]: A filtered list of URLs with unwanted entries removed.
@@ -169,7 +172,8 @@ class CompanyWebCrawler:
         """Asynchronously crawls the given list of URLs.
 
         Args:
-            base_url (str): The landing page url of the company.
+            crawler (AsyncWebCrawler): Crawler object initialized outside of the method.
+            urls (list[str]): The landing page url of the company.
 
         Returns:
             dict[str, dict]: A dictionary containing crawl results, including extracted content and links.
@@ -183,12 +187,17 @@ class CompanyWebCrawler:
         )
 
         config = CrawlerRunConfig(
-            # markdown_generator=DefaultMarkdownGenerator(
-            #     options={
-            #         'ignore_images': True,
-            #         'ignore_links': True
-            #     }
-            # ),
+            excluded_tags=["nav", "footer", "aside"],
+            excluded_selector="""
+                .cookie,
+                .cookies,
+                .cookie-banner,
+                .cookie-consent,
+                [id*="cookie"],
+                [class*="cookie"]
+            """,
+            remove_forms=True,
+            remove_overlay_elements=True,  # Any popup should be excluded!
             scan_full_page=True,
             check_robots_txt=True,
             semaphore_count=3,
@@ -210,7 +219,7 @@ class CompanyWebCrawler:
                 successful[result.url] = {
                     'status_code': result.status_code,
                     'markdown': result.markdown,
-                    'external_links': result.links.get('external', []),
+                    'links': result.links,
                     'date': self.current_date,
                 }
             else:
