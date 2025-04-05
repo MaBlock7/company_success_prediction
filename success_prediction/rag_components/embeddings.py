@@ -1,6 +1,22 @@
 import torch
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.text_splitter import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
+
+
+class SimpleSplitter:
+
+    def __init__(
+        self,
+        headers_to_split_on: list[tuple[str, str]] = [("#", "Header 1")],
+        chunk_size=4096,
+        chunk_overlap=128
+    ):
+        self.markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on, strip_headers=False)
+        self.recursive_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+
+    def split_text(self, text: str) -> list[str]:
+        md_header_splits = self.markdown_splitter.split_text(text)
+        return self.recursive_splitter.split_documents(md_header_splits)
 
 
 class EmbeddingCreator:
@@ -21,11 +37,7 @@ class EmbeddingCreator:
             model_kwargs=model_kwargs,
             encode_kwargs=encode_kwargs
         )
-
-        self.splitter = RecursiveCharacterTextSplitter(
-            chunk_size=514,
-            chunk_overlap=50,
-        )
+        self.splitter = SimpleSplitter()
 
     @staticmethod
     def _detect_device() -> str:

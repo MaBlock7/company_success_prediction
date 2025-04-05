@@ -1,2 +1,2 @@
 from scraper.serp_api import GoogleMapsScraper
-from scraper.website_scraper import CompanyWebCrawler
+from scraper.website_crawler import CompanyWebCrawler
