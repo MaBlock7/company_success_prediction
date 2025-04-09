@@ -1,202 +1,256 @@
+import argparse
 import asyncio
 import gzip
 import json
-from crawl4ai import AsyncWebCrawler
+import pandas as pd
+from crawl4ai import AsyncWebCrawler, BrowserConfig
 from scraper import CompanyWebCrawler
+from scraper.crawler_config import WANTED_KEYWORDS, UNWANTED_KEYWORDS
 from config import RAW_DATA_DIR
 
 
-UNWANTED_KEYWORDS = [
-    'news',
-    'terms-and-conditions',
-    'terms-of-use',
-    'imprint',
-    'blog',
-    'privacy',
-    'disclosure',
-    'legal',
-    'shop',
-    'store',
-    'career',
-    'jobs',
+def save_compressed_json(idx: int, file: dict, wayback: bool = False):
+    """Save a dictionary as a compressed JSON (.json.gz) file.
 
-    'neuigkeiten',
-    'impressum',
-    'datenschutz',
-    'datenschutzbestimmungen',
-    'karriere',
-
-    'nouvelles',               # news
-    'conditions-generales',    # terms and conditions
-    'mentions-legales',        # legal notice
-    'blog',
-    'confidentialite',         # privacy
-    'politique-de-confidentialite',
-    'divulgation',             # disclosure
-    'boutique',                # shop
-    'magasin',                 # store
-    'carriere',
-
-    'notizie',                 # news
-    'termini-e-condizioni',
-    'termini-di-utilizzo',
-    'informazioni-legali',     # legal notice / imprint
-    'blog',
-    'privacy',
-    'politica-sulla-privacy',
-    'divulgazione',
-    'negozio',
-    'store',
-    'carriera',
-]
-
-PRODUCT_KEYWORDS = [
-    "product", "service", "solution", "offerings", "platform", "features", "tools",
-    "application", "technology", "catalog", "portfolio", "what-we-offer", "what-we-do",
-
-    "produkte", "dienstleistung", "loesung", "angebot", "plattform", "funktionen",
-    "anwendung", "technologie", "katalog", "portfolio", "was-wir-anbieten", "was-wir-tun",
-
-    "produit", "service", "solution", "offre", "plateforme", "fonctionnalites", "outils",
-    "application", "technologie", "catalogue", "portfolio", "ce-que-nous-offrons", "ce-que-nous-faisons",
-
-    "prodotto", "servizio", "soluzione", "offerta", "piattaforma", "funzionalita", "strumenti",
-    "applicazione", "tecnologia", "catalogo", "portfolio", "cosa-offriamo", "cosa-facciamo"
-]
-
-ABOUT_TEAM_KEYWORDS = [
-    "about", "team", "founder", "people", "staff", "who-we-are", "company", "history",
-
-    "ueber-uns", "uber-uns", "gruender", "menschen", "mitarbeiter", "wer-wir-sind", "unternehmen", "geschichte",
-
-    "a-propos", "equipe", "fondateur", "personnes", "personnel", "qui-nous-sommes", "entreprise", "histoire",
-
-    "chi-siamo", "fondator", "persone", "staff", "azienda", "storia"
-]
-
-CONTACT_KEYWORDS = [
-    "contact", "kontakt", "contactez", "contatto"
-]
-
-VALUES_KEYWORDS = [
-    "values", "goal", "mission", "vision", "strategy", "purpose", "what-we-believe", "culture",
-    "principles", "commitment", "beliefs",
-
-    "werte", "ziel", "zweck", "glaubenssaetze", "strategie", "kultur",
-    "prinzipien", "engagement", "ueberzeugungen",
-
-    "valeurs", "but", "ce-que-nous-croyons", "culture",
-    "principes", "engagement", "convictions",
-
-    "valori", "obiettivo", "missione", "visione", "strategia", "scopo", "cosa-crediamo", "cultura",
-    "principi", "impegno", "credenze"
-]
+    Args:
+        idx (int): Index used to name the output file.
+        file (dict): The dictionary to save.
+        wayback (bool, optional): Whether to save as a Wayback Machine snapshot. Defaults to False.
+    """
+    name = f'{idx}_websites_wb.json.gz' if wayback else f'{idx}_websites.json.gz'
+    with gzip.open(RAW_DATA_DIR / 'company_websites' / name, 'wt', encoding='utf-8') as f:
+        json.dump(file, f, ensure_ascii=False, indent=2)
 
 
-def load_data():
-    return {
-        '1433629': {'url': 'https://www.chiron-services.ch', 'founding_date': (2020, 4, 17)},
-        '1417133': {'url': 'https://www.adresta.ch', 'founding_date': (2019, 12, 4)}
-    }
+def save_json(idx: int, file: dict, wayback: bool = False):
+    name = f'{idx}_websites_wb.json' if wayback else f'{idx}_websites.json'
+    with open(RAW_DATA_DIR / 'company_websites' / name, 'wt', encoding='utf-8') as f:
+        json.dump(file, f, ensure_ascii=False, indent=2)
 
-"""
-def save_json(ehraid: str, results: dict, wayback: bool = False):
-    name = f'{ehraid}_wb.json.gz' if wayback else f'{ehraid}.json.gz'
-    with gzip.open(RAW_DATA_DIR / name, 'wt', encoding='utf-8') as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
-"""
 
-def save_json(ehraid: str, results: dict, wayback: bool = False):
-    name = f'{ehraid}_wb.json' if wayback else f'{ehraid}.json'
-    with open(RAW_DATA_DIR / name, 'wt', encoding='utf-8') as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
+def save_urls(urls: list[str]) -> None:
+    """Append a list of URLs to a text file.
 
-async def process_base_url(cwc, ehraid, base_url, max_depth: int = 1):
+    Args:
+        urls (list[str]): List of URLs to append.
+    """
+    with open(RAW_DATA_DIR / 'company_urls' / 'internal_urls.txt', 'a') as f:
+        for url in urls:
+            f.write(f'{url}\n')
+
+
+async def bfs_search_urls(crawler: AsyncWebCrawler, cwc: CompanyWebCrawler, base_url: str, max_depth: int) -> list[str]:
+    """Perform a breadth-first search to discover internal URLs from a base URL.
+
+    Args:
+        crawler (AsyncWebCrawler): The asynchronous web crawler instance.
+        cwc (CompanyWebCrawler): The company-specific crawler logic.
+        base_url (str): The base URL to start crawling from.
+        max_depth (int): Maximum BFS depth.
+
+    Returns:
+        list[str]: A list of discovered internal URLs.
+    """
+    urls, scraped = [base_url], set()
+    for _ in range(max_depth):
+        to_scrape = [url for url in urls if url not in scraped]
+        if not to_scrape:
+            break
+        temp_results = await cwc.crawl(crawler, to_scrape)
+
+    scraped.update(to_scrape)
+
+    for content in temp_results.values():
+        for link in content.get('links', {}).get('internal', []):
+            href = link.get('href').rstrip('/')
+            if href and ('www.' in href) and (href not in urls):
+                urls.append(href)
+
+    return urls
+
+
+async def process_base_url(
+    crawler: AsyncWebCrawler,
+    cwc: CompanyWebCrawler,
+    ehraid: int,
+    base_url: str,
+    max_depth: int = 1,
+    urls_only: bool = False
+) -> dict:
+    """Process a base URL to either save URLs or crawl filtered content.
+
+    Args:
+        crawler (AsyncWebCrawler): The web crawler.
+        cwc (CompanyWebCrawler): The company-specific web crawler.
+        ehraid (int): Unique identifier for the company.
+        base_url (str): The base URL to process.
+        max_depth (int, optional): Depth of link crawling. Defaults to 1.
+        urls_only (bool, optional): Whether to only save discovered URLs. Defaults to False.
+
+    Returns:
+        dict: A dictionary mapping the ehraid to the crawl result.
+    """
     try:
-        try:
-            urls = await asyncio.wait_for(asyncio.to_thread(cwc.get_urls, base_url), timeout=10)
-        except asyncio.TimeoutError:
-            print(f"[Timeout] Sitemap fetch for {base_url} took too long.")
-            urls = []
+        crawler.logger.info(message=base_url, tag='FETCH SITEMAP')
+        urls = await asyncio.to_thread(cwc.get_urls, base_url)
 
-        async with AsyncWebCrawler() as crawler:
-            if not urls:
-                urls, scraped = [base_url], set()
-                for _ in range(max_depth):
-                    to_scrape = [url for url in urls if url not in scraped]
-                    if not to_scrape:
-                        break
-                    temp_results = await cwc.crawl(crawler, to_scrape)
+    except (TimeoutError) as e:
+        # Website (base_url) is unresponsive, therefore we don't need to try further
+        crawler.logger.error(
+            message=f'Error occured for {base_url}: {e}',
+            tag='UNRESPONSIVE ERROR'
+        )
+        return {ehraid: {base_url: {'status_code': 408, 'error_message': str(e)}}}
 
-                scraped.update(to_scrape)
+    except (RuntimeError, ValueError) as e:
+        # Sitemap for base_url doesn't exist, but website is responsive
+        crawler.logger.error(
+            message=f'Error occured for {base_url}: {e}',
+            tag='NO SITEMAP ERROR'
+        )
+        urls = []
 
-                for content in temp_results.values():
-                    for link in content.get('links', {}).get('internal', []):
-                        href = link.get('href').rstrip('/')
-                        if href and ('www.' in href) and (href not in urls):
-                            urls.append(href)
+    if not urls:
+        urls = await bfs_search_urls(crawler, cwc, base_url, max_depth)
 
-            filtered_urls = cwc.filter_urls(urls, min_pages=10, max_pages=20)
-            results = await cwc.crawl(crawler, filtered_urls)
-            await asyncio.to_thread(save_json, ehraid, {ehraid: results}, True)
+    if urls_only:
+        await asyncio.to_thread(save_urls, urls)
 
-    except Exception as e:
-        print(f"Error occurred during processing of {base_url}: {e}")
+    else:
+        filtered_urls = cwc.filter_urls(urls, min_pages=10, max_pages=20)
+        results = await cwc.crawl(crawler, filtered_urls)
+        return {ehraid: results}
 
 
 async def wayback_process_base_url(
-    cwc,
-    ehraid,
-    base_url,
-    year,
-    month,
-    day,
+    crawler: AsyncWebCrawler,
+    cwc: CompanyWebCrawler,
+    ehraid: int,
+    base_url: str,
+    year: int,
+    month: int,
+    day: int,
     max_depth: int = 1
-):
+) -> dict:
+    """Process a base URL using the Wayback Machine for a specific date to retrieve
+    historical versions of a website.
+
+    Args:
+        crawler (AsyncWebCrawler): The web crawler.
+        cwc (CompanyWebCrawler): The company-specific web crawler.
+        ehraid (int): Unique identifier for the company.
+        base_url (str): The base URL to process.
+        year (int): Year of snapshot.
+        month (int): Month of snapshot.
+        day (int): Day of snapshot.
+        max_depth (int, optional): Depth of link crawling. Defaults to 1.
+
+    Returns:
+        dict: A dictionary mapping the ehraid to the crawl result.
+    """
     wayback_base_url, timestamp = cwc.get_closest_snapshot(base_url, year, month, day)
+
     if not wayback_base_url:
         print(f"No snapshot found for {base_url}")
         return
+
     try:
-        async with AsyncWebCrawler() as crawler:
-            urls, scraped = [base_url], set()
-            for _ in range(max_depth):
-                to_scrape = [url for url in urls if url not in scraped]
+        urls, scraped = [base_url], set()
+        for _ in range(max_depth):
+            to_scrape = [url for url in urls if url not in scraped]
 
-                if not to_scrape:
-                    break
-                temp_results = await cwc.crawl(crawler, cwc.create_wayback_urls(to_scrape, timestamp))
+            if not to_scrape:
+                break
+            temp_results = await cwc.crawl(crawler, cwc.create_wayback_urls(to_scrape, timestamp))
 
-            scraped.update(to_scrape)
+        scraped.update(to_scrape)
 
-            for content in temp_results.values():
-                for link in content.get('links', {}).get('internal', []):
-                    href = link.get('href').rstrip('/')
-                    if href and ('www.' in href) and (href not in urls):
-                        urls.append(href)
+        for content in temp_results.values():
+            for link in content.get('links', {}).get('internal', []):
+                href = link.get('href').rstrip('/')
+                if href and ('www.' in href) and (href not in urls):
+                    urls.append(href)
 
-            filtered_urls = cwc.filter_urls(urls, min_pages=10, max_pages=20)
-            results = await cwc.crawl(crawler, filtered_urls)
-            await asyncio.to_thread(save_json, ehraid, {ehraid: results})
+        filtered_urls = cwc.filter_urls(urls, min_pages=10, max_pages=20)
+        results = await cwc.crawl(crawler, filtered_urls)
+        return {ehraid: results}
 
     except Exception as e:
         print(f"Error occurred during processing of {base_url}: {e}")
 
 
-async def main():
-    unique_wanted_keywords = list({k for k in PRODUCT_KEYWORDS+ABOUT_TEAM_KEYWORDS+CONTACT_KEYWORDS+VALUES_KEYWORDS})
-    unique_unwanted_keywords = list({k for k in UNWANTED_KEYWORDS})
+async def main(args):
+
     cwc = CompanyWebCrawler(
-        wanted_keywords=unique_wanted_keywords,
-        unwanted_keywords=unique_unwanted_keywords
+        wanted_keywords=WANTED_KEYWORDS,
+        unwanted_keywords=UNWANTED_KEYWORDS
     )
-    ehraid2data = load_data()
 
-    # tasks = [process_base_url(cwc, ehraid, data['url']) for ehraid, data in ehraid2data.items()]
-    tasks = [wayback_process_base_url(cwc, ehraid, data['url'], data['founding_date'][0], data['founding_date'][1], data['founding_date'][2]) for ehraid, data in ehraid2data.items()]
+    crawler = AsyncWebCrawler(
+        browser_config=BrowserConfig(
+            headers={'Accept-Language': 'en,de;q=0.8,fr;q=0.6,it;q=0.4'},  # Prefer English version of website but accept German, French, or Italian as an alternative
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        )
+    )
 
-    await asyncio.gather(*tasks)
+    await crawler.start()
+
+    try:
+
+        with pd.read_csv(
+            RAW_DATA_DIR / 'company_urls' / 'urls.csv',
+            parse_dates=['founding_date'],
+            chunksize=5,
+            usecols=['ehraid', 'company_url', 'founding_date']
+        ) as reader:
+
+            for i, subset_df in enumerate(reader):
+
+                if args.wayback:
+                    tasks = [
+                        wayback_process_base_url(
+                            crawler,
+                            cwc,
+                            ehraid=data['ehraid'],
+                            base_url=data['company_url'],
+                            year=data['founding_date'].year,
+                            month=data['founding_date'].month,
+                            day=data['founding_date'].day
+                        ) for _, data in subset_df.iterrows()
+                    ]
+                else:
+                    tasks = [
+                        process_base_url(
+                            crawler,
+                            cwc,
+                            ehraid=data['ehraid'],
+                            base_url=data['company_url'],
+                            urls_only=args.url_only
+                        ) for _, data in subset_df.iterrows()
+                    ]
+
+                results = await asyncio.gather(*tasks)
+
+                storage_file = {}
+                for result in results:
+                    storage_file.update(result)
+
+                save_compressed_json(idx=i, file=storage_file, wayback=args.wayback)
+
+    except Exception as e:
+        print(f'Unexpected error occured: {e}')
+
+    finally:
+        await crawler.close()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(
+        prog='CompanyCrawler',
+        description='Crawls the websites for given company urls',
+    )
+    parser.add_argument('--wayback', action='store_true')
+    parser.add_argument('--url_only', action='store_true')
+    args = parser.parse_args()
+
+    asyncio.run(main(args))
