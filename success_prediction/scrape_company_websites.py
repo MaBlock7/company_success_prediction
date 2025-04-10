@@ -69,13 +69,81 @@ async def bfs_search_urls(crawler: AsyncWebCrawler, cwc: CompanyWebCrawler, base
     return urls
 
 
+async def fetch_urls_from_landing_page(
+    crawler: AsyncWebCrawler,
+    cwc: CompanyWebCrawler,
+    base_url: str,
+    max_depth: int = 1,
+    semaphore: asyncio.Semaphore = None,
+) -> None:
+    if semaphore:
+        async with semaphore:
+            return await _fetch_urls(crawler, cwc, base_url, max_depth)
+    return await _fetch_urls(crawler, cwc, base_url, max_depth)
+
+
+async def _fetch_urls(
+    crawler: AsyncWebCrawler,
+    cwc: CompanyWebCrawler,
+    base_url: str,
+    max_depth: int = 1
+) -> None:
+    """Fetches the internal links present on the landing page of a website.
+
+    Args:
+        crawler (AsyncWebCrawler): The web crawler.
+        cwc (CompanyWebCrawler): The company-specific web crawler.
+        base_url (str): The base URL to process.
+        max_depth (int, optional): Depth of link crawling. Defaults to 1.
+
+    Returns:
+        dict: A dictionary mapping the ehraid to the crawl result.
+    """
+    try:
+        crawler.logger.info(message=base_url, tag='FETCH SITEMAP')
+        urls = await asyncio.to_thread(cwc.get_urls, base_url)
+
+    except (TimeoutError) as e:
+        # Website (base_url) is unresponsive, therefore we don't need to try further
+        crawler.logger.error(
+            message=f'Error occured for {base_url}: {e}',
+            tag='UNRESPONSIVE ERROR'
+        )
+        return
+
+    except (RuntimeError, ValueError) as e:
+        # Sitemap for base_url doesn't exist, but website is responsive
+        crawler.logger.error(
+            message=f'Error occured for {base_url}: {e}',
+            tag='NO SITEMAP ERROR'
+        )
+        urls = []
+
+    if not urls:
+        urls = await bfs_search_urls(crawler, cwc, base_url, max_depth)
+    await asyncio.to_thread(save_urls, urls)
+
+
 async def process_base_url(
     crawler: AsyncWebCrawler,
     cwc: CompanyWebCrawler,
     ehraid: int,
     base_url: str,
     max_depth: int = 1,
-    urls_only: bool = False
+    semaphore: asyncio.Semaphore = None,
+) -> dict:
+    if semaphore:
+        async with semaphore:
+            return await _process_base_url(crawler, cwc, ehraid, base_url, max_depth)
+    return await _process_base_url(crawler, cwc, ehraid, base_url, max_depth)
+
+
+async def _process_base_url(
+    crawler: AsyncWebCrawler,
+    cwc: CompanyWebCrawler,
+    ehraid: int,
+    base_url: str,
+    max_depth: int = 1,
 ) -> dict:
     """Process a base URL to either save URLs or crawl filtered content.
 
@@ -85,7 +153,6 @@ async def process_base_url(
         ehraid (int): Unique identifier for the company.
         base_url (str): The base URL to process.
         max_depth (int, optional): Depth of link crawling. Defaults to 1.
-        urls_only (bool, optional): Whether to only save discovered URLs. Defaults to False.
 
     Returns:
         dict: A dictionary mapping the ehraid to the crawl result.
@@ -113,16 +180,29 @@ async def process_base_url(
     if not urls:
         urls = await bfs_search_urls(crawler, cwc, base_url, max_depth)
 
-    if urls_only:
-        await asyncio.to_thread(save_urls, urls)
-
-    else:
-        filtered_urls = cwc.filter_urls(urls, min_pages=10, max_pages=20)
-        results = await cwc.crawl(crawler, filtered_urls)
-        return {ehraid: results}
+    filtered_urls = cwc.filter_urls(urls, min_pages=10, max_pages=20)
+    results = await cwc.crawl(crawler, filtered_urls)
+    return {ehraid: results}
 
 
 async def wayback_process_base_url(
+    crawler: AsyncWebCrawler,
+    cwc: CompanyWebCrawler,
+    ehraid: int,
+    base_url: str,
+    year: int,
+    month: int,
+    day: int,
+    max_depth: int = 1,
+    semaphore: asyncio.Semaphore = None,
+) -> dict:
+    if semaphore:
+        async with semaphore:
+            return await _wayback_process(crawler, cwc, ehraid, base_url, year, month, day, max_depth)
+    return await _wayback_process(crawler, cwc, ehraid, base_url, year, month, day, max_depth)
+
+
+async def _wayback_process(
     crawler: AsyncWebCrawler,
     cwc: CompanyWebCrawler,
     ehraid: int,
@@ -187,20 +267,22 @@ async def main(args):
     )
 
     crawler = AsyncWebCrawler(
-        browser_config=BrowserConfig(
+        config=BrowserConfig(
             headers={'Accept-Language': 'en,de;q=0.8,fr;q=0.6,it;q=0.4'},  # Prefer English version of website but accept German, French, or Italian as an alternative
             user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         )
     )
+
+    semaphore = asyncio.Semaphore(args.semaphore)
 
     await crawler.start()
 
     try:
 
         with pd.read_csv(
-            RAW_DATA_DIR / 'company_urls' / 'urls.csv',
+            RAW_DATA_DIR / 'company_urls' / 'urls_de.csv',
             parse_dates=['founding_date'],
-            chunksize=5,
+            chunksize=500,
             usecols=['ehraid', 'company_url', 'founding_date']
         ) as reader:
 
@@ -215,7 +297,17 @@ async def main(args):
                             base_url=data['company_url'],
                             year=data['founding_date'].year,
                             month=data['founding_date'].month,
-                            day=data['founding_date'].day
+                            day=data['founding_date'].day,
+                            semaphore=semaphore
+                        ) for _, data in subset_df.iterrows()
+                    ]
+                elif args.urls_only:
+                    tasks = [
+                        fetch_urls_from_landing_page(
+                            crawler,
+                            cwc,
+                            base_url=data['company_url'],
+                            semaphore=semaphore
                         ) for _, data in subset_df.iterrows()
                     ]
                 else:
@@ -225,11 +317,14 @@ async def main(args):
                             cwc,
                             ehraid=data['ehraid'],
                             base_url=data['company_url'],
-                            urls_only=args.url_only
+                            semaphore=semaphore
                         ) for _, data in subset_df.iterrows()
                     ]
 
                 results = await asyncio.gather(*tasks)
+
+                if args.urls_only:
+                    continue
 
                 storage_file = {}
                 for result in results:
@@ -250,7 +345,8 @@ if __name__ == "__main__":
         description='Crawls the websites for given company urls',
     )
     parser.add_argument('--wayback', action='store_true')
-    parser.add_argument('--url_only', action='store_true')
+    parser.add_argument('--urls_only', action='store_true')
+    parser.add_argument('--semaphore', default=20)
     args = parser.parse_args()
 
     asyncio.run(main(args))

@@ -3,16 +3,28 @@ import requests
 from requests.exceptions import RequestException, ConnectionError
 from datetime import date, timedelta, datetime
 from urllib.parse import urlparse
-from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LXMLWebScrapingStrategy
 from crawl4ai.async_dispatcher import MemoryAdaptiveDispatcher
 from playwright.async_api import Error as PlaywrightError
 
 from xml.etree import ElementTree
 
 
+class CrawlError(Exception):
+    def __init__(self, url, original_exception):
+        super().__init__(f"Error for URL {url}: {original_exception}")
+        self.url = url
+        self.original_exception = original_exception
+
+
 class URLFilter:
 
-    def __init__(self, wanted_keywords: list[str], unwanted_keywords: list[str], lang_exceptions: list[str]):
+    def __init__(
+        self,
+        wanted_keywords: list[str],
+        unwanted_keywords: list[str],
+        lang_exceptions: list[str]
+    ):
         self.lang_pattern = re.compile(r"/([a-z]{2})/")
         self.lang_exceptions = lang_exceptions
         self._wanted_keywords = [k.lower() for k in wanted_keywords]
@@ -89,7 +101,9 @@ class CompanyWebCrawler:
             Defaults to `['de', 'en']`.
 
     Example:
-        >>> crawler = CompanyWebCrawler(unwanted_words=['news', 'terms-of-use'])
+        >>> crawler = CompanyWebCrawler(
+                wanted_words=['product', 'about-us'],
+                unwanted_words=['news', 'terms-of-use'])
         >>> urls = crawler.get_urls("https://example.com")
         >>> filtered_urls = crawler.filter_urls(urls)
         >>> results = asyncio.run(crawler.crawl(filtered_urls))
@@ -123,13 +137,16 @@ class CompanyWebCrawler:
     @staticmethod
     def _create_url_list(root: ElementTree.Element, namespace: dict[str, str]) -> list[str]:
         """Creates a list of urls from the root of the sitemap.xml."""
-        return [loc.text.replace('\n', '').strip() for loc in root.findall('.//ns:loc', namespace)]
+        return [loc.text.replace('\n', '').strip() for loc in root.findall('.//ns:loc', namespace)] if namespace else []
 
     def _crawl_sitemap(self, sitemap_url: str) -> tuple[ElementTree.Element, dict[str, str]]:
         """Tries to fetch the sitemap.xml for a URL and extract its root and namespace."""
         try:
             response = requests.get(sitemap_url, timeout=10)
             response.raise_for_status()
+
+            if 'xml' not in response.headers.get('Content-Type', ''):
+                raise ValueError('Sitemap is not XML')
 
             root = ElementTree.fromstring(response.content)
             namespace = self._detect_namespace(root)
@@ -180,7 +197,13 @@ class CompanyWebCrawler:
         except Exception:
             raise
 
-    def get_closest_snapshot(url: str, year: int, month: int, day: int, window_days: int = 730) -> dict | None:
+    def get_closest_snapshot(
+        url: str,
+        year: int,
+        month: int,
+        day: int,
+        window_days: int = 365
+    ) -> dict | None:
         """
         Finds the closest available snapshot to the given date using the CDX API.
 
@@ -226,10 +249,19 @@ class CompanyWebCrawler:
             "url": f"https://web.archive.org/web/{closest_row[1]}/{closest_row[2]}"
         }
 
-    def filter_urls(self, urls: list[str], min_pages: int = 10, max_pages: int = 20):
+    def filter_urls(
+        self,
+        urls: list[str],
+        min_pages: int = 10,
+        max_pages: int = 20
+    ) -> list[str]:
         return self.filter.filter_urls(urls, min_pages, max_pages)
 
-    async def crawl(self, crawler: AsyncWebCrawler, urls: list[str]):
+    async def crawl(
+        self,
+        crawler: AsyncWebCrawler,
+        urls: list[str]
+    ) -> dict[str, dict]:
         """Asynchronously crawls the given list of URLs.
 
         Args:
@@ -242,13 +274,14 @@ class CompanyWebCrawler:
         successful = {}
 
         dispatcher = MemoryAdaptiveDispatcher(
-            memory_threshold_percent=70.0,
+            memory_threshold_percent=75.0,
             check_interval=1.0,
             max_session_permit=10,
         )
 
         try:
             config = CrawlerRunConfig(
+                scraping_strategy=LXMLWebScrapingStrategy(),
                 excluded_tags=["nav", "footer", "aside"],
                 excluded_selector="""
                     [class*="cookie"],
@@ -279,8 +312,12 @@ class CompanyWebCrawler:
                 remove_overlay_elements=True,  # Any popup should be excluded!
                 scan_full_page=True,
                 check_robots_txt=True,
-                semaphore_count=3,
                 stream=False,
+                wait_until="networkidle",
+                page_timeout=100_000,
+                delay_before_return_html=0.2,
+                mean_delay=0.2,
+                max_range=0.5
             )
 
             results = await crawler.arun_many(
@@ -304,7 +341,17 @@ class CompanyWebCrawler:
             return successful
 
         except PlaywrightError as e:
-            crawler.logger.error(message=e, tag='PLAYWRIGHT ERROR')
+            # Add context about all attempted URLs
+            crawler.logger.error(
+                message=f"PlaywrightError while crawling URLs: {urls}\n{e}",
+                tag='PLAYWRIGHT ERROR'
+            )
+            return {url: {'status_code': None, 'error_message': str(e)} for url in urls}
 
         except Exception as e:
-            crawler.logger.error(message=e, tag='UNEXPECTED ERROR')
+            # Add context for better debugging
+            crawler.logger.error(
+                message=f"Unexpected error while crawling URLs: {urls}\n{e}",
+                tag='UNEXPECTED ERROR'
+            )
+            return {url: {'status_code': None, 'error_message': str(e)} for url in urls}
