@@ -2,6 +2,7 @@ black
 crawl4ai
 flake8
 fasttext-langdetect
+html5lib
 ipython
 isort
 jarowinkler
