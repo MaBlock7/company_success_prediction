@@ -1,7 +1,9 @@
 import os
 import dotenv
 import pandas as pd
-from config import PROJ_ROOT
+from pocketknife.database import (
+    connect_database, read_from_database)
+from config import PROJ_ROOT, RAW_DATA_DIR
 from scraper import GoogleMapsScraper
 
 dotenv_path = os.path.join(PROJ_ROOT, '.env')
@@ -15,12 +17,40 @@ def load_data():
     Returns:
         A list of tuples containing company data.
     """
-    return [
-        ('CHE472481853', 'Bitcoin Suisse AG', 'Zug', 'Grafenauweg'),
-        ('CHE312574485', 'Bitcoin Capital AG', 'Zug', 'Gubelstrasse'),
-        ('CHE152876230', 'Chiron Services GmbH', 'Zürich', 'Badenerstrasse'),
-        ('CHE152876230', 'Chiron Services GmbH', 'Basel', 'Starenstrasse'),
-    ]
+    # This query gets a all firms (except branches) that existed between 2016 and current
+    query_all_active_firms = """
+        SELECT 
+            base.name,
+            base.ehraid,
+            base.uid,
+            address.street,
+            address.town,
+        FROM zefix.base base
+        -- Get only companies where we have the full history from founding (2016-present)
+        LEFT JOIN (
+            SELECT s.ehraid, s.shab_id, s.shab_date
+            FROM zefix.shab s
+            WHERE s.shab_id IN (
+                SELECT shab_id
+                FROM zefix.shab_mutation
+                WHERE description = 'status.neu'
+            )
+        ) AS shab
+        ON base.ehraid = shab.ehraid
+        -- Join the addresses of the firms
+        LEFT JOIN zefix.address address
+        ON base.ehraid = address.ehraid
+        --Exclude all kind of branches
+        WHERE
+            (NOT base.delete_date < '2016-01-01' OR base.delete_date IS NULL)
+            AND NOT base.legal_form_id IN (9, 11, 13, 14, 18, 19)
+            AND NOT base.is_branch
+            AND LOWER(base.name) NOT LIKE '%zweigniederlassung%'
+            AND LOWER(base.name) NOT LIKE '%succursale%';
+    """
+    with connect_database() as con:
+        company_data = read_from_database(con, query=query_all_active_firms)
+    return [(row['ehraid'], row['name'], row['town'], row['street'],) for _, row in company_data.iterrows()]
 
 
 def check_if_scraped(scraped_results: dict = None, potential_matches: list[dict] | dict = None):
@@ -60,12 +90,12 @@ def evaluate_conditions(company_name: str, street: str, town: str, match: dict) 
     return perfect_name_match, partial_name_match, street_name_match, town_name_match, has_no_address
 
 
-def parse(uid: str, company_name: str, town: str, street: str, scraped_results: dict = None, potential_matches: list[dict] | dict = None):
+def parse(ehraid: str, company_name: str, town: str, street: str, scraped_results: dict = None, potential_matches: list[dict] | dict = None):
     """
     Parses scraped data and identifies perfect or close matches.
 
     Args:
-        uid (str): Unique identifier for the company.
+        ehraid (str): Unique identifier for the company.
         company_name (str): The company name.
         town (str): The town name.
         street (str): The street name.
@@ -76,7 +106,7 @@ def parse(uid: str, company_name: str, town: str, street: str, scraped_results: 
         A tuple of lists of perfect and close matches. Both are of the following format:
 
         {'query': {
-            'uid': 'CHE472481853',
+            'ehraid': '123',
             'company_name': 'Bitcoin Suisse AG',
             'town': 'Zug',
             'street': 'Grafenauweg'},
@@ -100,7 +130,7 @@ def parse(uid: str, company_name: str, town: str, street: str, scraped_results: 
         for match in results:
             line = {
                 'query': {
-                    'uid': uid,
+                    'ehraid': ehraid,
                     'company_name': company_name,
                     'town': town,
                     'street': street,
@@ -132,12 +162,12 @@ def parse(uid: str, company_name: str, town: str, street: str, scraped_results: 
     return [], []
 
 
-def find_perfect_match(uid: str, company_name: str, town: str, street: str, search_dict: dict) -> list[dict] | None:
+def find_perfect_match(ehraid: str, company_name: str, town: str, street: str, search_dict: dict) -> list[dict] | None:
     """
     Finds a perfect match for the company name in the search dictionary.
 
     Args:
-        uid (str): Unique identifier for the company.
+        ehraid (str): Unique identifier for the company.
         company_name (str): The company name.
         town (str): The town name.
         street (str): The street name.
@@ -151,18 +181,18 @@ def find_perfect_match(uid: str, company_name: str, town: str, street: str, sear
     match = search_dict.get(company_name_lower)
 
     if match:
-        perfect_match, _ = parse(uid, company_name, town, street, potential_matches=match)
+        perfect_match, _ = parse(ehraid, company_name, town, street, potential_matches=match)
         if perfect_match:
             return perfect_match
     return None
 
 
-def find_fuzzy_match(uid: str, company_name: str, town: str, street: str, search_dict: dict)  -> list[dict] | None :
+def find_fuzzy_match(ehraid: str, company_name: str, town: str, street: str, search_dict: dict)  -> list[dict] | None :
     """
     Finds a fuzzy match for the company name by checking partial matches in the search dictionary.
 
     Args:
-        uid (str): Unique identifier for the company.
+        ehraid (str): Unique identifier for the company.
         company_name (str): The company name.
         town (str): The town name.
         street (str): The street name.
@@ -176,7 +206,7 @@ def find_fuzzy_match(uid: str, company_name: str, town: str, street: str, search
     fuzzy_matches = [match for matched_name, match in search_dict.items() if matched_name.lower() in company_name_lower]
 
     if fuzzy_matches:
-        perfect_match, _ = parse(uid, company_name, town, street, potential_matches=fuzzy_matches)
+        perfect_match, _ = parse(ehraid, company_name, town, street, potential_matches=fuzzy_matches)
         if perfect_match:
             return perfect_match
     return None
@@ -203,17 +233,17 @@ def main():
     perfect_matches = []
     search_dict = {}
 
-    for uid, company_name, town, street in data:
+    for ehraid, company_name, town, street in data:
 
         # Check if there is a perfect match for the company name already in the search dict
-        match = find_perfect_match(uid, company_name, town, street, search_dict)
+        match = find_perfect_match(ehraid, company_name, town, street, search_dict)
         if match:
             perfect_matches.extend(match)
             update_search_dict(search_dict, match)
             continue
 
         # Check if there is a close match for the company already in the search dict keys
-        fuzzy_match = find_fuzzy_match(uid, company_name, town, street, search_dict)
+        fuzzy_match = find_fuzzy_match(ehraid, company_name, town, street, search_dict)
         if fuzzy_match:
             perfect_matches.extend(fuzzy_match)
             update_search_dict(search_dict, fuzzy_match)
@@ -221,7 +251,7 @@ def main():
 
         # Else scrape the data from Google Maps to find the url
         json_data = scraper.search(company_name, town)
-        perfect_match, potential_matches = parse(uid, company_name, town, street, scraped_results=json_data)
+        perfect_match, potential_matches = parse(ehraid, company_name, town, street, scraped_results=json_data)
         perfect_matches.extend(perfect_match)
 
         for match in potential_matches:
@@ -234,3 +264,10 @@ def main():
 
 if __name__ == '__main__':
     perfect_matches, search_dict = main()
+    output_data = [{
+        'ehraid': line['query']['ehraid'],
+        'company_name': line['query']['company_name'],
+        'company_url': line['match']['link']
+    } for line in perfect_matches]
+
+    pd.DataFrame(output_data).to_csv(RAW_DATA_DIR / 'company_urls' / 'scraped_urls.csv', index=False)
