@@ -19,7 +19,7 @@ def load_data():
     """
     # This query gets a all firms (except branches) that existed between 2016 and current
     query_all_active_firms = """
-        SELECT 
+        SELECT
             base.name,
             base.ehraid,
             base.uid,

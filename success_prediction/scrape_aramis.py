@@ -7,7 +7,6 @@ import pandas as pd
 from config import RAW_DATA_DIR
 
 
-
 def to_aramis_date(dt: datetime) -> str:
     """Converts a datetime object to the ARAMIS timestamp string format.
 
