@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import gzip
 import json
+import traceback
 import pandas as pd
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 from scraper import CompanyWebCrawler
@@ -17,9 +18,12 @@ def save_compressed_json(idx: int, file: dict, wayback: bool = False):
         file (dict): The dictionary to save.
         wayback (bool, optional): Whether to save as a Wayback Machine snapshot. Defaults to False.
     """
-    name = f'{idx}_websites_wb.json.gz' if wayback else f'{idx}_websites.json.gz'
-    with gzip.open(RAW_DATA_DIR / 'company_websites' / name, 'wt', encoding='utf-8') as f:
+    name_a = f'{idx}_websites_wb.json.gz' if wayback else f'{idx}_websites.json.gz'
+    name_b = 'completed_ehraids_wb.txt' if wayback else 'completed_ehraids_wb.txt'
+    with gzip.open(RAW_DATA_DIR / 'company_websites' / name_a, 'wt', encoding='utf-8') as f:
         json.dump(file, f, ensure_ascii=False, indent=2)
+    with open(RAW_DATA_DIR / 'company_websites' / name_b, 'a', encoding='utf-8') as f:
+        f.writelines([str(ehraid) + '\n' for ehraid in file.keys()])
 
 
 def save_json(idx: int, file: dict, wayback: bool = False):
@@ -186,7 +190,6 @@ async def _process_base_url(
 
 
 async def wayback_process_base_url(
-    crawler: AsyncWebCrawler,
     cwc: CompanyWebCrawler,
     ehraid: int,
     base_url: str,
@@ -198,12 +201,11 @@ async def wayback_process_base_url(
 ) -> dict:
     if semaphore:
         async with semaphore:
-            return await _wayback_process(crawler, cwc, ehraid, base_url, year, month, day, max_depth)
-    return await _wayback_process(crawler, cwc, ehraid, base_url, year, month, day, max_depth)
+            return await _wayback_process(cwc, ehraid, base_url, year, month, day, max_depth)
+    return await _wayback_process(cwc, ehraid, base_url, year, month, day, max_depth)
 
 
 async def _wayback_process(
-    crawler: AsyncWebCrawler,
     cwc: CompanyWebCrawler,
     ehraid: int,
     base_url: str,
@@ -216,7 +218,6 @@ async def _wayback_process(
     historical versions of a website.
 
     Args:
-        crawler (AsyncWebCrawler): The web crawler.
         cwc (CompanyWebCrawler): The company-specific web crawler.
         ehraid (int): Unique identifier for the company.
         base_url (str): The base URL to process.
@@ -228,31 +229,8 @@ async def _wayback_process(
     Returns:
         dict: A dictionary mapping the ehraid to the crawl result.
     """
-    wayback_base_url, timestamp = cwc.get_closest_snapshot(base_url, year, month, day)
-
-    if not wayback_base_url:
-        print(f"No snapshot found for {base_url}")
-        return
-
     try:
-        urls, scraped = [base_url], set()
-        for _ in range(max_depth):
-            to_scrape = [url for url in urls if url not in scraped]
-
-            if not to_scrape:
-                break
-            temp_results = await cwc.crawl(crawler, cwc.create_wayback_urls(to_scrape, timestamp))
-
-        scraped.update(to_scrape)
-
-        for content in temp_results.values():
-            for link in content.get('links', {}).get('internal', []):
-                href = link.get('href').rstrip('/')
-                if href and ('www.' in href) and (href not in urls):
-                    urls.append(href)
-
-        filtered_urls = cwc.filter_urls(urls, min_pages=10, max_pages=20)
-        results = await cwc.crawl(crawler, filtered_urls)
+        results = await cwc.wayback_crawl(base_url, year, month, day, max_depth=max_depth)
         return {ehraid: results}
 
     except Exception as e:
@@ -260,6 +238,12 @@ async def _wayback_process(
 
 
 async def main(args):
+
+    completed_ehraids_path = RAW_DATA_DIR / 'company_websites' / 'completed_ehraids.txt'
+    completed_ehraids = []
+    if completed_ehraids_path.exists():
+        with open(completed_ehraids_path, 'r') as f:
+            completed_ehraids = [int(line.replace('\n', '')) for line in f.readlines()]
 
     cwc = CompanyWebCrawler(
         wanted_keywords=WANTED_KEYWORDS,
@@ -273,20 +257,25 @@ async def main(args):
         )
     )
 
-    semaphore = asyncio.Semaphore(args.semaphore)
+    semaphore = asyncio.Semaphore(int(args.semaphore))
 
     await crawler.start()
 
     try:
 
         with pd.read_csv(
-            RAW_DATA_DIR / 'company_urls' / 'urls_de.csv',
+            RAW_DATA_DIR / 'company_sample' / 'company_sample_website.csv',
             parse_dates=['founding_date'],
             chunksize=500,
             usecols=['ehraid', 'company_url', 'founding_date']
         ) as reader:
 
             for i, subset_df in enumerate(reader):
+
+                subset_df = subset_df[(~subset_df['ehraid'].isin(completed_ehraids)) & (~subset_df['company_url'].isna())]
+
+                if subset_df.empty:
+                    continue
 
                 if args.wayback:
                     tasks = [
@@ -327,16 +316,16 @@ async def main(args):
                     continue
 
                 storage_file = {}
-                for result in results:
-                    storage_file.update(result)
+                if results:
+                    for result in results:
+                        if isinstance(result, dict):
+                            storage_file.update(result)
 
                 save_compressed_json(idx=i, file=storage_file, wayback=args.wayback)
-
-    except Exception as e:
-        print(f'Unexpected error occured: {e}')
-
-    finally:
-        await crawler.close()
+        crawler.close()
+    except Exception:
+        print('Unexpected error occured:')
+        traceback.print_exc()
 
 
 if __name__ == "__main__":

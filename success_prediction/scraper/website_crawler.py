@@ -1,12 +1,15 @@
 import re
 import requests
-from requests.exceptions import RequestException, ConnectionError
+from requests.exceptions import RequestException, ConnectionError, JSONDecodeError
 from datetime import date, timedelta, datetime
 from urllib.parse import urlparse
-from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LXMLWebScrapingStrategy
+from crawl4ai import (
+    AsyncWebCrawler, CrawlerRunConfig, WebScrapingStrategy, LXMLWebScrapingStrategy)
 from crawl4ai.async_dispatcher import MemoryAdaptiveDispatcher
+from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from playwright.async_api import Error as PlaywrightError
-
+from wayback import WaybackClient, Mode
+from wayback.exceptions import MementoPlaybackError
 from xml.etree import ElementTree
 
 
@@ -116,16 +119,17 @@ class CompanyWebCrawler:
     ):
         self.filter = URLFilter(wanted_keywords, unwanted_keywords, lang_exceptions)
         self.current_date = datetime.today().strftime('%Y-%m-%d')
+        self.wayback_client = WaybackClient()
 
     @staticmethod
     def _create_sitemap_url(base_url: str) -> str:
         """Adds sitemap subdomain to a base url."""
-        return f"{base_url.rstrip('/')}/sitemap.xml"
+        return f"{base_url.rstrip('/')}/sitemap.xml" if isinstance(base_url, str) else ''
 
     @staticmethod
     def create_wayback_urls(urls: list[str], timestamp: str):
         """Creates wayback url for internal links when using the wayback machine."""
-        return [f'http://web.archive.org/web/{timestamp}/{url}' for url in urls]
+        return [f'http://web.archive.org/web/{timestamp}/{url}' for url in urls if isinstance(url, str)]
 
     @staticmethod
     def _detect_namespace(root: ElementTree.Element) -> dict[str, str]:
@@ -179,6 +183,8 @@ class CompanyWebCrawler:
             ValueError: If the XML parsing fails due to an invalid format.
         """
         sitemap_url = self._create_sitemap_url(base_url)
+        if not sitemap_url:
+            return []
         try:
             root, namespace = self._crawl_sitemap(sitemap_url)
 
@@ -198,6 +204,7 @@ class CompanyWebCrawler:
             raise
 
     def get_closest_snapshot(
+        self,
         url: str,
         year: int,
         month: int,
@@ -215,39 +222,22 @@ class CompanyWebCrawler:
         Returns:
             dict or None: Closest snapshot info or None if not found.
         """
-        from_date = date(year, month, day)
-        to_date = (from_date + timedelta(days=window_days)).strftime('%Y%m%d')
+        try:
+            from_date = date(year=year, month=month, day=day)
+            to_date = (from_date + timedelta(days=window_days)).strftime('%Y%m%d')
 
-        url = (
-            f"https://web.archive.org/cdx/search/cdx?"
-            f"url={url}&matchType=exact&limit=100&filter=statuscode:200"
-            f"&from={from_date}&to={to_date}&output=json"
-        )
+            results = self.wayback_client.search(url, from_date=from_date, to_date=to_date)
 
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
+            if not results:
+                return None
 
-        if len(data) <= 1:
-            return None  # No snapshots found
+            closest_record = next(results)
+            return closest_record.timestamp.strftime("%Y%m%d%H%M%S")
 
-        # Parse snapshots and find the closest one to the target date
-        snapshots = data[1:]  # Skip header
-        snapshots_with_distance = []
+        except Exception as e:
+            print(f"Unexpected error in get_closest_snapshot for {url}: {e}")
 
-        for row in snapshots:
-            ts = row[1]  # timestamp string, e.g. "20210417012345"
-            snapshot_date = datetime.strptime(ts, "%Y%m%d%H%M%S").date()
-            distance = abs((snapshot_date - from_date).days)
-            snapshots_with_distance.append((distance, row))
-
-        # Pick the closest snapshot
-        _, closest_row = min(snapshots_with_distance, key=lambda x: x[0])
-        return {
-            "timestamp": closest_row[1],
-            "original": closest_row[2],
-            "url": f"https://web.archive.org/web/{closest_row[1]}/{closest_row[2]}"
-        }
+        return None
 
     def filter_urls(
         self,
@@ -257,10 +247,129 @@ class CompanyWebCrawler:
     ) -> list[str]:
         return self.filter.filter_urls(urls, min_pages, max_pages)
 
+    async def extract_wayback_content(
+        self,
+        url: str,
+        scraping_strategy: WebScrapingStrategy,
+        md_generator: DefaultMarkdownGenerator,
+        year: int,
+        month: int,
+        day: int,
+        window_days: int = 365,
+        strategy_config: dict = {
+            "excluded_tags": ["nav", "footer", "aside"],
+            "excluded_selector": """
+                [class*="cookie"],
+                [id*="cookie"],
+                [class*="consent"],
+                [id*="consent"],
+                [class*="privacy"],
+                [id*="privacy"],
+                [class*="gdpr"],
+                [id*="gdpr"],
+                [class*="ccpa"],
+                [id*="ccpa"],
+                [class^="ch2-"],
+                [id^="ch2-"],
+                #onetrust-banner-sdk,
+                .ot-sdk-container,
+                .ot-pc-header,
+                #CybotCookiebotDialog,
+                .CybotCookiebotDialog,
+                .qc-cmp2-container,
+                #qc-cmp2-ui,
+                .truste-message,
+                .truste-overlay,
+                .iubenda-cookie-policy,
+                .usercentrics-root
+            """,
+        }
+    ):
+        try:
+            from_date = date(year=year, month=month, day=day)
+            to_date = (from_date + timedelta(days=window_days))
+            response = list(self.wayback_client.search(url, from_date=from_date, to_date=to_date, limit=20))
+
+            if not response:
+                raise ValueError("No archive entries found")
+            oldest_record = min(response, key=lambda r: r.timestamp)
+            content = self.wayback_client.get_memento(oldest_record, Mode.view, exact=False, target_window=365*24*60*60)  # Allow fetching of the same page within the first year if broken archive
+            parsed_content = scraping_strategy.scrap(url, content.text, kwargs=strategy_config)
+            markdown = md_generator(parsed_content.cleaned_html)
+            links = {'internal': [link.__dict__ for link in parsed_content.links.internal],
+                     'external': [link.__dict__ for link in parsed_content.links.external]}
+            # Extract closest content from memento that is a non-broken archived page
+            return {
+                'status_code': 200,
+                'markdown': markdown,
+                'links': links,
+                'date': oldest_record.timestamp.strftime('%Y-%m-%d'),
+            }
+        except MementoPlaybackError as e:
+            return {
+                'status_code': 404,
+                'error_message': 'MementoPlaybackError'
+            }
+        except Exception as e:
+            return {
+                'status_code': 400,
+                'error_message': 'Unexpected Error'
+            }
+
+    async def wayback_crawl(
+        self,
+        base_url: str,
+        year: int,
+        month: int,
+        day: int,
+        window_days: int = 365,
+        max_depth: int = 1
+    ):
+        if isinstance(base_url, str) and not base_url.endswith('/'):
+            base_url += '/'
+
+        scraping_strategy = WebScrapingStrategy()
+        md_generator = DefaultMarkdownGenerator()
+
+        successful = {}
+
+        urls, scraped = [base_url], set()
+        for _ in range(max_depth):
+            to_scrape = [u for u in urls if u not in scraped]
+            if not to_scrape:
+                break
+
+            for url in to_scrape:
+                result = await self.extract_wayback_content(
+                    url,
+                    scraping_strategy,
+                    md_generator,
+                    year,
+                    month,
+                    day,
+                    window_days
+                )
+
+                if result['status_code'] != 200:
+                    successful[url] = result
+                    continue
+
+                successful[url] = result
+
+                for link in result.get('links', {}).get('internal', []):
+                    href = link.get('href').rstrip('/')
+                    if href and ('www.' in href) and (href not in urls):
+                        urls.append(href)
+
+            scraped.update(to_scrape)
+
+        filtered_urls = self.filter_urls(urls, min_pages=10, max_pages=20)
+        return {key: successful[key] for key in filtered_urls}
+
     async def crawl(
         self,
         crawler: AsyncWebCrawler,
-        urls: list[str]
+        urls: list[str],
     ) -> dict[str, dict]:
         """Asynchronously crawls the given list of URLs.
 
@@ -311,13 +420,14 @@ class CompanyWebCrawler:
                 remove_forms=True,
                 remove_overlay_elements=True,  # Any popup should be excluded!
                 scan_full_page=True,
+                process_iframes=True,
                 check_robots_txt=True,
                 stream=False,
                 wait_until="networkidle",
                 page_timeout=100_000,
                 delay_before_return_html=0.2,
                 mean_delay=0.2,
-                max_range=0.5
+                max_range=0.5,
             )
 
             results = await crawler.arun_many(
@@ -355,3 +465,5 @@ class CompanyWebCrawler:
                 tag='UNEXPECTED ERROR'
             )
             return {url: {'status_code': None, 'error_message': str(e)} for url in urls}
+
+from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator

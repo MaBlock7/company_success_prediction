@@ -270,4 +270,4 @@ if __name__ == '__main__':
         'company_url': line['match']['link']
     } for line in perfect_matches]
 
-    pd.DataFrame(output_data).to_csv(RAW_DATA_DIR / 'company_urls' / 'scraped_urls.csv', index=False)
+    pd.DataFrame(output_data).to_csv(RAW_DATA_DIR / 'company_urls' / 'urls.csv', index=False)
