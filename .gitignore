@@ -172,3 +172,6 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 notebooks/new_inscriptions_2016-2025.csv
+
+# Files
+*.pdf
