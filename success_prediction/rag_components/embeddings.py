@@ -50,5 +50,7 @@ class EmbeddingCreator:
     def chunk(self, text: str) -> list[str]:
         return self.splitter.split_text(text)
 
-    def embed(self, documents: list[str]) -> list[list[float]]:
+    def embed(self, documents: list[str], prefix: None|str = None) -> list[list[float]]:
+        if prefix:
+            documents = [f'{prefix} {text}' for text in documents]
         return self.embedder.embed_documents(documents)

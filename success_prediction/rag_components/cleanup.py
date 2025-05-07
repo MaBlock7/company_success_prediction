@@ -1,4 +1,5 @@
 import re
+from ftfy import fix_text
 
 
 class MarkdownCleaner:
@@ -17,7 +18,7 @@ class MarkdownCleaner:
     _WHITESPACE_PATTERN = re.compile(r' +')
 
     def _remove_links_from_markdown(
-        markdown: str,
+        self, markdown: str,
         internal_links: list[str],
         external_links: list[str]
     ) -> str:
@@ -75,6 +76,54 @@ class MarkdownCleaner:
         # Normalize white spaces
         return MarkdownCleaner._WHITESPACE_PATTERN.sub(' ', markdown.strip())
 
+    @staticmethod
+    def normalize_whitespace(markdown: str) -> str:
+        """Normalizes the whitespaces in a document by applying the following steps:
+
+        1. Replace multiple \n or mixed whitespace+newlines with a single \n
+        2. Replace multiple spaces/tabs with a single space (within lines)
+        3. Strip leading/trailing whitespace on each line
+
+        Args:
+            markdown: The markdown text to clean.
+
+        Returns:
+            The normalized markdown text.
+        """
+        markdown = re.sub(r'[\s]*\n[\s\n]*', '\n', markdown)
+        markdown = re.sub(r'[ \t]+', ' ', markdown)
+        lines = [line.strip() for line in markdown.split('\n')]
+        return '\n'.join(line for line in lines if line)
+
+    @staticmethod
+    def _remove_bracket_type(s: str, open_bracket: str, close_bracket: str):
+        """Removes content from a given type of bracket including the brackets"""
+        stack = []
+        result = []
+        for char in s:
+            if char == open_bracket:
+                stack.append(char)
+            elif char == close_bracket and stack:
+                stack.pop()
+            elif not stack:
+                result.append(char)
+        return ''.join(result)
+
+    def remove_nested_brackets(self, markdown: str):
+        """Removes the content in brackets from
+        the document, which is most often links, images
+        or other potentially missleading text.
+
+        Args:
+            markdown: The markdown text to clean.
+
+        Returns:
+            The markdown text without brackets.
+        """
+        markdown = self._remove_bracket_type(markdown, '[', ']')
+        markdown = self._remove_bracket_type(markdown, '(', ')')
+        return self.normalize_whitespace(markdown)
+
     def clean(
         self, markdown: str,
         internal_links: list[str],
@@ -92,11 +141,14 @@ class MarkdownCleaner:
         Returns:
             The cleaned markdown text.
         """
-
-        # Add additional cleaning steps here...
-
-        return self._remove_links_from_markdown(
+        # Remove all links from the markdown text to remove noise
+        no_link_md = self._remove_links_from_markdown(
             markdown,
             internal_links=internal_links,
             external_links=external_links
         )
+
+        # Fix encoding problems in markdown
+        fixed_text = fix_text(no_link_md)
+
+        return fixed_text
