@@ -40,6 +40,14 @@ unwanted_words = [
     'negozio',
     'store',
     'carriera',
+
+    # File extensions
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv', '.ppt', '.pptx',
+    '.zip', '.rar', '.7z', '.tar', '.gz',
+
+    # Common admin or non-content paths
+    'login', 'register', 'signup', 'signin', 'logout',
+    'admin', 'dashboard', 'account', 'user',
 ]
 
 product_keywords = [

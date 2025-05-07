@@ -3,6 +3,7 @@ import asyncio
 import gzip
 import json
 import traceback
+from tqdm.asyncio import tqdm_asyncio
 import pandas as pd
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 from scraper import CompanyWebCrawler
@@ -18,18 +19,15 @@ def save_compressed_json(idx: int, file: dict, wayback: bool = False):
         file (dict): The dictionary to save.
         wayback (bool, optional): Whether to save as a Wayback Machine snapshot. Defaults to False.
     """
-    name_a = f'{idx}_websites_wb.json.gz' if wayback else f'{idx}_websites.json.gz'
-    name_b = 'completed_ehraids_wb.txt' if wayback else 'completed_ehraids_wb.txt'
-    with gzip.open(RAW_DATA_DIR / 'company_websites' / name_a, 'wt', encoding='utf-8') as f:
+    folder = 'wayback' if wayback else 'current'
+    with gzip.open(RAW_DATA_DIR / 'company_websites' / folder / f'{idx}_websites.json.gz', 'wt', encoding='utf-8') as f:
         json.dump(file, f, ensure_ascii=False, indent=2)
-    with open(RAW_DATA_DIR / 'company_websites' / name_b, 'a', encoding='utf-8') as f:
-        f.writelines([str(ehraid) + '\n' for ehraid in file.keys()])
 
 
-def save_json(idx: int, file: dict, wayback: bool = False):
-    name = f'{idx}_websites_wb.json' if wayback else f'{idx}_websites.json'
-    with open(RAW_DATA_DIR / 'company_websites' / name, 'wt', encoding='utf-8') as f:
-        json.dump(file, f, ensure_ascii=False, indent=2)
+def seve_completed_ehraids(ehraids: list[int], wayback: bool = False):
+    folder = 'wayback' if wayback else 'current'
+    with open(RAW_DATA_DIR / 'company_websites' / folder / 'completed_ehraids.txt', 'a', encoding='utf-8') as f:
+        f.writelines([str(ehraid) + '\n' for ehraid in ehraids])
 
 
 def save_urls(urls: list[str]) -> None:
@@ -239,7 +237,8 @@ async def _wayback_process(
 
 async def main(args):
 
-    completed_ehraids_path = RAW_DATA_DIR / 'company_websites' / 'completed_ehraids.txt'
+    file_name = 'completed_ehraids_wb.txt' if args.wayback else 'completed_ehraids.txt'
+    completed_ehraids_path = RAW_DATA_DIR / 'company_websites' / file_name
     completed_ehraids = []
     if completed_ehraids_path.exists():
         with open(completed_ehraids_path, 'r') as f:
@@ -262,17 +261,17 @@ async def main(args):
     await crawler.start()
 
     try:
-
+        chunk_size = 500
         with pd.read_csv(
             RAW_DATA_DIR / 'company_sample' / 'company_sample_website.csv',
             parse_dates=['founding_date'],
-            chunksize=500,
+            chunksize=chunk_size,
             usecols=['ehraid', 'company_url', 'founding_date']
         ) as reader:
 
             for i, subset_df in enumerate(reader):
-
                 subset_df = subset_df[(~subset_df['ehraid'].isin(completed_ehraids)) & (~subset_df['company_url'].isna())]
+                print(f'At index {i}: {len(subset_df)} entries to scrape...')
 
                 if subset_df.empty:
                     continue
@@ -280,7 +279,6 @@ async def main(args):
                 if args.wayback:
                     tasks = [
                         wayback_process_base_url(
-                            crawler,
                             cwc,
                             ehraid=data['ehraid'],
                             base_url=data['company_url'],
@@ -309,8 +307,10 @@ async def main(args):
                             semaphore=semaphore
                         ) for _, data in subset_df.iterrows()
                     ]
-
-                results = await asyncio.gather(*tasks)
+                if args.wayback:
+                    results = await tqdm_asyncio.gather(*tasks, desc="Processing", total=len(tasks))
+                else:
+                    results = await asyncio.gather(*tasks)
 
                 if args.urls_only:
                     continue
@@ -322,6 +322,8 @@ async def main(args):
                             storage_file.update(result)
 
                 save_compressed_json(idx=i, file=storage_file, wayback=args.wayback)
+                seve_completed_ehraids(subset_df['ehraid'].tolist(), wayback=args.wayback)
+
         crawler.close()
     except Exception:
         print('Unexpected error occured:')
