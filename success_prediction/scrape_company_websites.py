@@ -3,7 +3,7 @@ import asyncio
 import gzip
 import json
 import traceback
-from tqdm.asyncio import tqdm_asyncio
+import time
 import pandas as pd
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 from scraper import CompanyWebCrawler
@@ -11,7 +11,7 @@ from scraper.crawler_config import WANTED_KEYWORDS, UNWANTED_KEYWORDS
 from config import RAW_DATA_DIR
 
 
-def save_compressed_json(idx: int, file: dict, wayback: bool = False):
+def save_compressed_json(session_id, idx: int, file: dict, wayback: bool = False):
     """Save a dictionary as a compressed JSON (.json.gz) file.
 
     Args:
@@ -20,7 +20,7 @@ def save_compressed_json(idx: int, file: dict, wayback: bool = False):
         wayback (bool, optional): Whether to save as a Wayback Machine snapshot. Defaults to False.
     """
     folder = 'wayback' if wayback else 'current'
-    with gzip.open(RAW_DATA_DIR / 'company_websites' / folder / f'{idx}_websites.json.gz', 'wt', encoding='utf-8') as f:
+    with gzip.open(RAW_DATA_DIR / 'company_websites' / folder / f'{idx}_websites_{session_id}.json.gz', 'wt', encoding='utf-8') as f:
         json.dump(file, f, ensure_ascii=False, indent=2)
 
 
@@ -251,6 +251,7 @@ async def _wayback_process(
 
 async def main(args):
 
+    crawling_shesh = int(time.time()) 
     folder = 'wayback' if args.wayback else 'current'
     completed_ehraids_path = RAW_DATA_DIR / 'company_websites' / folder / 'completed_ehraids.txt'
     completed_ehraids = []
@@ -290,6 +291,7 @@ async def main(args):
                     continue
 
                 storage_file = {}
+                completed_ehraids = []
                 for chunk_df in split_dataframe(subset_df, n=10):
 
                     await crawler.start()
@@ -340,6 +342,7 @@ async def main(args):
                                 continue
                             elif isinstance(res, dict):
                                 storage_file.update(res)
+                                completed_ehraids.extend(subset_df['ehraid'].tolist())
 
                         await crawler.close()
 
@@ -348,8 +351,8 @@ async def main(args):
                         await crawler.close()
                         continue
 
-                save_compressed_json(idx=i, file=storage_file, wayback=args.wayback)
-                save_completed_ehraids(subset_df['ehraid'].tolist(), wayback=args.wayback)
+                save_compressed_json(crawling_shesh, idx=i, file=storage_file, wayback=args.wayback)
+                save_completed_ehraids(completed_ehraids, wayback=args.wayback)
 
     except Exception:
         print('Unexpected error occured:')
