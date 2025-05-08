@@ -404,12 +404,6 @@ class CompanyWebCrawler:
         """
         successful = {}
 
-        dispatcher = MemoryAdaptiveDispatcher(
-            memory_threshold_percent=75.0,
-            check_interval=1.0,
-            max_session_permit=10,
-        )
-
         try:
             config = CrawlerRunConfig(
                 scraping_strategy=LXMLWebScrapingStrategy(),
@@ -442,21 +436,17 @@ class CompanyWebCrawler:
                 remove_forms=True,
                 remove_overlay_elements=True,  # Any popup should be excluded!
                 scan_full_page=True,
-                process_iframes=True,
+                process_iframes=False,
                 check_robots_txt=True,
                 stream=False,
-                wait_until="networkidle",
-                page_timeout=100_000,
+                wait_until="domcontentloaded",
+                page_timeout=30_000,
                 delay_before_return_html=0.2,
                 mean_delay=0.2,
                 max_range=0.5,
             )
 
-            results = await crawler.arun_many(
-                urls,
-                config=config,
-                dispatcher=dispatcher,
-            )
+            results = await crawler.arun_many(urls, config=config)
             for result in results:
                 if result.success:
                     successful[result.url] = {
@@ -487,5 +477,3 @@ class CompanyWebCrawler:
                 tag='UNEXPECTED ERROR'
             )
             return {url: {'status_code': None, 'error_message': str(e)} for url in urls}
-
-from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
