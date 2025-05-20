@@ -1,6 +1,7 @@
 import torch
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from sentence_transformers import CrossEncoder
+from langchain.schema import Document
 from langchain.text_splitter import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 
 
@@ -26,6 +27,41 @@ class SimpleSplitter:
             **kwargs
         )
 
+    def merge_small_chunks(self, documents: list[Document], min_char: int = 100) -> list[Document]:
+        """Merges chunks when a chunk is contains less than a minimum of characters to avoid
+        ending up with small and uninformative chunks.
+
+        Args:
+            documents (list[Documents]): The chunks from the markdown splitter.
+
+        Returns:
+            list[Documents]: The merged chunks.
+        """
+        merged_docs = []
+        buffer_content = ""
+        buffer_metadata = {}
+
+        for doc in documents:
+            content = doc.page_content.strip()
+            if len(content) < min_char:
+                buffer_content += "\n" + content
+                buffer_metadata.update(doc.metadata)
+            else:
+                if buffer_content:
+                    # Merge buffer with current content
+                    merged_content = buffer_content + "\n" + content
+                    merged_docs.append(Document(page_content=merged_content.strip(), metadata=doc.metadata))
+                    buffer_content = ""
+                    buffer_metadata = {}
+                else:
+                    merged_docs.append(doc)
+
+        # Handle leftover buffer at the end
+        if buffer_content:
+            merged_docs.append(Document(page_content=buffer_content.strip(), metadata=buffer_metadata))
+
+        return merged_docs
+
     def split_text(self, text: str) -> list[str]:
         """Splits the input text into smaller chunks using markdown headers and recursive character splitting.
 
@@ -36,7 +72,8 @@ class SimpleSplitter:
             list[str]: A list of split text chunks.
         """
         md_header_splits = self.markdown_splitter.split_text(text)
-        return self.recursive_splitter.split_documents(md_header_splits)
+        md_combined = self.merge_small_chunks(md_header_splits)  # Avoid very smull chunks
+        return self.recursive_splitter.split_documents(md_combined)
 
 
 class EmbeddingHandler:

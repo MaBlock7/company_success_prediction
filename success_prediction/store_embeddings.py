@@ -146,6 +146,7 @@ def run_pipeline(clients: Clients, idx: int, file_path: Path, **kwargs) -> None:
                     'date': date,
                     'language': language.get('lang'),
                     'text': md,
+                    'text_length': len(md),
                     'embedding_passage': p_emb,
                     'embedding_query': q_emb
                 }
@@ -197,12 +198,14 @@ def main(args: argparse.Namespace):
         FieldSchema(name="date", dtype=DataType.VARCHAR, max_length=10),
         FieldSchema(name="language", dtype=DataType.VARCHAR, max_length=5),
         FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=64_000),
+        FieldSchema(name="text_length", dtype=DataType.INT64),
         FieldSchema(name="embedding_passage", dtype=DataType.FLOAT_VECTOR, dim=768),
         FieldSchema(name="embedding_query", dtype=DataType.FLOAT_VECTOR, dim=768),
     ])
     setup_database(clients.db_client, collection_name=args.collection_name, schema=website_schema, replace=args.replace or False)
 
     raw_files = [file for file in Path(RAW_DATA_DIR / 'company_websites' / 'current').iterdir() if str(file).endswith('.json.gz')]
+    # raw_files = [RAW_DATA_DIR / 'company_websites' / 'current' / '0_websites.json.gz']
 
     for i, file in enumerate(raw_files):
         run_pipeline(clients, idx=i, file_path=file, collection_name=args.collection_name)
