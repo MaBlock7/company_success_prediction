@@ -1,77 +1,60 @@
+"""
+Keywords were machine-translated for French and Italian
+"""
+
 unwanted_words = [
-    'news',
-    'terms-and-conditions',
-    'terms-of-use',
-    'imprint',
-    'blog',
-    'privacy',
-    'disclosure',
-    'legal',
-    'shop',
-    'store',
-    'career',
-    'jobs',
-
-    'neuigkeiten',
-    'impressum',
-    'datenschutz',
-    'datenschutzbestimmungen',
-    'karriere',
-
-    'nouvelles',               # news
-    'conditions-generales',    # terms and conditions
-    'mentions-legales',        # legal notice
-    'blog',
-    'confidentialite',         # privacy
-    'politique-de-confidentialite',
-    'divulgation',             # disclosure
-    'boutique',                # shop
-    'magasin',                 # store
-    'carriere',
-
-    'notizie',                 # news
-    'termini-e-condizioni',
-    'termini-di-utilizzo',
-    'informazioni-legali',     # legal notice / imprint
-    'blog',
-    'privacy',
-    'politica-sulla-privacy',
-    'divulgazione',
-    'negozio',
-    'store',
-    'carriera',
+    "news", "neuigkeiten", "nouvelles", "notizie",
+    "terms-and-conditions", "datenschutzbestimmungen", "conditions-generales", "termini-e-condizioni",
+    "terms-of-use", "nutzungsbedingungen", "conditions-d'utilisation", "termini-di-utilizzo",
+    "imprint", "impressum", "mentions-legales", "informazioni-legali",
+    "blog", "blog", "blog", "blog",
+    "privacy", "datenschutz", "confidentialite", "privacy",
+    "disclosure", "offenlegung", "divulgation", "divulgazione",
+    "legal", "rechtliches", "mentions-legales", "informazioni-legali",
+    "shop", "laden", "boutique", "negozio",
+    "store", "einkauf", "magasin", "store",
+    "career", "karriere", "carriere", "carriera",
+    "jobs", "offene stellen", "emplois", "lavori",
 
     # File extensions
-    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv', '.ppt', '.pptx',
-    '.zip', '.rar', '.7z', '.tar', '.gz',
+    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".ppt", ".pptx",
+    ".zip", ".rar", ".7z", ".tar", ".gz",
 
-    # Common admin or non-content paths
-    'login', 'register', 'signup', 'signin', 'logout',
-    'admin', 'dashboard', 'account', 'user',
+    # Admin and non-content paths
+    "login", "register", "signup", "signin", "logout",
+    "admin", "dashboard", "account", "user"
 ]
 
 product_keywords = [
-    "product", "service", "solution", "offerings", "platform", "features", "tools",
-    "application", "technology", "catalog", "portfolio", "what-we-offer", "what-we-do",
-
-    "produkte", "leistung", "loesung", "angebot", "plattform", "funktionen",
-    "anwendung", "technologie", "katalog", "portfolio", "was-wir-anbieten", "was-wir-tun",
-
-    "produit", "service", "solution", "offre", "plateforme", "fonctionnalites", "outils",
-    "application", "technologie", "catalogue", "portfolio", "ce-que-nous-offrons", "ce-que-nous-faisons",
-
-    "prodotto", "servizio", "soluzione", "offerta", "piattaforma", "funzionalita", "strumenti",
-    "applicazione", "tecnologia", "catalogo", "portfolio", "cosa-offriamo", "cosa-facciamo"
+    "product", "produkte", "produit", "prodotto",
+    "service", "leistung", "service", "servizio",
+    "solution", "loesung", "solution", "soluzione",
+    "offering", "angebot", "offre", "offerta",
+    "platform", "plattform", "plateforme", "piattaforma",
+    "features", "funktionen", "fonctionnalites", "funzionalita",
+    "tool", "tool", "outil", "strumento", "strumenti",
+    "application", "anwendung", "application", "applicazione",
+    "technology", "technologie", "technologie", "tecnologia",
+    "catalog", "katalog", "catalogue", "catalogo",
+    "portfolio", "portfolio", "portfolio", "portfolio",
+    "what-we-offer", "was-wir-anbieten", "ce-que-nous-offrons", "cosa-offriamo",
+    "what-we-do", "was-wir-tun", "ce-que-nous-faisons", "cosa-facciamo",
 ]
 
 team_keywords = [
-    "about", "team", "founder", "people", "staff", "who-we-are", "company", "history",
-
-    "ueber-uns", "uber-uns", "gruender", "menschen", "mitarbeiter", "wer-wir-sind", "unternehmen", "geschichte",
-
-    "a-propos", "equipe", "fondateur", "personnes", "personnel", "qui-nous-sommes", "entreprise", "histoire",
-
-    "chi-siamo", "fondator", "persone", "staff", "azienda", "storia"
+    "about", "ueber-uns", "a-propos", "chi-siamo",
+    "team", "mitarbeiter", "equipe", "staff",
+    "founder", "gruender", "fondateur", "fondator",
+    "leadership", "leitung", "dirigeants", "dirigenti",
+    "board", "vorstand", "administration", "dirigenti",
+    "people", "menschen", "personnes", "persone",
+    "staff", "mitarbeiter", "personnel", "staff",
+    "who-we-are", "wer-wir-sind", "qui-nous-sommes", "chi-siamo",
+    "company", "unternehmen", "entreprise", "azienda",
+    "history", "geschichte", "histoire", "storia",
+    "management", "leitung", "administration", "dirigenti",
+    "executives", "vorstand", "dirigeants", "dirigenti",
+    "bio", "biographie", "a-propos", "chi-siamo",
 ]
 
 contact_keywords = [
@@ -79,18 +62,47 @@ contact_keywords = [
 ]
 
 value_keywords = [
-    "values", "goal", "mission", "vision", "strategy", "purpose", "what-we-believe", "culture",
-    "principles", "commitment", "beliefs",
-
-    "werte", "ziel", "zweck", "glaubenssaetze", "strategie", "kultur",
-    "prinzipien", "engagement", "ueberzeugungen",
-
-    "valeurs", "but", "ce-que-nous-croyons", "culture",
-    "principes", "engagement", "convictions",
-
-    "valori", "obiettivo", "missione", "visione", "strategia", "scopo", "cosa-crediamo", "cultura",
-    "principi", "impegno", "credenze"
+    "values", "werte", "valeurs", "valori",
+    "goal", "ziel", "but", "obiettivo",
+    "mission", "zweck", "ce-que-nous-croyons", "missione",
+    "vision", "glaubenssaetze", "ce-que-nous-croyons", "visione",
+    "strategy", "strategie", "principes", "strategia",
+    "purpose", "zweck", "ce-que-nous-croyons", "scopo",
+    "what-we-believe", "glaubenssaetze", "ce-que-nous-croyons", "cosa-crediamo",
+    "culture", "kultur", "culture", "cultura",
+    "principles", "prinzipien", "principes", "principi",
+    "commitment", "engagement", "engagement", "impegno",
+    "beliefs", "ueberzeugungen", "convictions", "credenze",
 ]
 
-WANTED_KEYWORDS = list({k for k in product_keywords + team_keywords + contact_keywords + value_keywords})
+esg_keywords = [
+    "sustainability", "nachhaltigkeit", "durabilite", "sostenibilita",
+    "sustainable", "nachhaltig", "durable", "sostenibile",
+    "esg", "esg", "esg", "esg",
+    "environment", "umwelt", "environnement", "ambiente",
+    "climate", "klima", "climat", "clima",
+    "carbon", "co2", "carbone", "carbonio",
+    "net-zero", "netto-null", "zerocarbone", "emissionizero",
+    "decarbonization", "dekarbonisierung", "decarbonation", "decarbonizzazione",
+    "csr", "verantwortung", "responsabilite", "responsabilita",
+    "responsibility", "verantwortung", "responsabilite", "responsabilita",
+    "responsible", "verantwortung", "responsabilite", "responsabilita",
+    "social", "wirkung", "impact", "filantropia",
+    "impact", "wirkung", "impact", "filantropia",
+    "governance", "verantwortung", "gouvernance", "responsabilita",
+    "diversity", "vielfalt", "diversite", "diversita",
+    "equality", "gleichstellung", "egalite", "equita",
+    "inclusion", "inklusion", "inclusion", "inclusione",
+    "community", "gemeinschaft", "communaute", "comunita",
+    "ethics", "ethik", "ethique", "etica",
+    "human-rights", "menschenrechte", "droitshumains", "dirittiumani",
+    "initiative", "initiative", "initiative", "iniziativa",
+    "wellbeing", "wohlbefinden", "bienetre", "benessere",
+    "volunteer", "freiwilligenarbeit", "engagement", "volontariato",
+    "engagement", "stakeholder", "partiesprenantes", "coinvolgimento",
+    "contributions", "zuwendungen", "engagement", "coinvolgimento",
+    "donations", "spenden", "engagement", "coinvolgimento",
+]
+
+WANTED_KEYWORDS = list({k for k in product_keywords + team_keywords + contact_keywords + value_keywords + esg_keywords})
 UNWANTED_KEYWORDS = list({k for k in unwanted_words})

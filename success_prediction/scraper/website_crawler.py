@@ -1,4 +1,5 @@
 from typing import Any
+import math
 import re
 import requests
 from requests.exceptions import RequestException, ConnectionError
@@ -6,7 +7,6 @@ from datetime import date, timedelta, datetime
 from urllib.parse import urlparse
 from crawl4ai import (
     AsyncWebCrawler, CrawlerRunConfig, WebScrapingStrategy, LXMLWebScrapingStrategy)
-from crawl4ai.async_dispatcher import MemoryAdaptiveDispatcher
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from playwright.async_api import Error as PlaywrightError
 from wayback import WaybackClient, Mode, Memento
@@ -49,7 +49,7 @@ class URLFilter:
     def _score_url(self, url: str):
         path = urlparse(url).path
         depth = len([p for p in path.split('/') if p])
-        scaling_factor = 1 / depth if depth else 1  # Prioritize shallow paths
+        scaling_factor = 1 / math.sqrt(depth) if depth else 1  # Prioritize shallow paths
 
         wanted_matches = any(k in path for k in self._wanted_keywords)
         unwanted_matches = any(k in path for k in self._unwanted_keywords)
@@ -67,22 +67,23 @@ class URLFilter:
         sorted_urls = sorted(((url, self._score_url(url)) for url in urls), key=lambda x: x[1], reverse=True)
         return [url for url, score in sorted_urls if score > 0]
 
-    def filter_urls(self, urls: list[str], min_pages: int = 10, max_pages: int = 15) -> list[str]:
+    def filter_urls(self, base_url: str, urls: list[str], min_pages: int = 15, max_pages: int = 50) -> list[str]:
         """Filters unwanted URLs based on language and specific keywords.
 
         Args:
             urls (list[str]): A list of URLs to be filtered.
-            min_pages (int): If less than min_pages remain after filtering pages 
+            base_url (str): The base URL to process.
+            min_pages (int): If less than min_pages remain after filtering pages
                 with an explicitly set language in the URL, no pages are removed.
             max_pages (int): The maximum number of pages that are downloaded.
 
         Returns:
             list[str]: A filtered list of URLs with unwanted entries removed.
         """
-        urls = [url for url in urls if '#' not in url]
+        urls = [url for url in urls if '#' not in url and url != base_url]
         filtered_urls = self._filter_unwanted_languages(urls, min_pages)
         ranked_urls = self._rank_urls(filtered_urls)
-        return ranked_urls[:max_pages]
+        return [base_url] + ranked_urls[:(max_pages - 1)]
 
 
 class CompanyWebCrawler:
@@ -100,7 +101,7 @@ class CompanyWebCrawler:
 
     Args:
         unwanted_words (list[str]): If a URL contains any of these words, it will be excluded from the crawl.
-        lang_exceptions (list[str], optional): The languages that should not lead to an exclusion of the URL from the crawl. 
+        lang_exceptions (list[str], optional): The languages that should not lead to an exclusion of the URL from the crawl.
             Defaults to `['de', 'en']`.
 
     Example:
@@ -159,19 +160,19 @@ class CompanyWebCrawler:
             return root, namespace
 
         except TimeoutError as e:
-            raise TimeoutError(f"Timeout fetching sitemap") from e
+            raise TimeoutError("Timeout fetching sitemap") from e
         except ConnectionError as e:
-            raise TimeoutError(f"Connection error fetching sitemap") from e
+            raise TimeoutError("Connection error fetching sitemap") from e
         except RequestException as e:
-            raise RuntimeError(f"Request error fetching sitemap") from e
+            raise RuntimeError("Request error fetching sitemap") from e
         except ElementTree.ParseError as e:
-            raise ValueError(f"Failed to parse XML") from e
+            raise ValueError("Failed to parse XML") from e
 
     def get_urls(self, base_url: str) -> list[str]:
         """Retrieves all URLs from the sitemap of the given base URL.
 
-        This method attempts to fetch and parse the sitemap located at the base URL. 
-        It supports both regular sitemaps and sitemap index files, retrieving URLs 
+        This method attempts to fetch and parse the sitemap located at the base URL.
+        It supports both regular sitemaps and sitemap index files, retrieving URLs
         recursively when necessary.
 
         Args:
@@ -207,15 +208,16 @@ class CompanyWebCrawler:
 
     def filter_urls(
         self,
+        base_url: str,
         urls: list[str],
-        min_pages: int = 10,
-        max_pages: int = 20
+        min_pages: int = 15,
+        max_pages: int = 50
     ) -> list[str]:
-        return self.filter.filter_urls(urls, min_pages, max_pages)
+        return self.filter.filter_urls(base_url, urls, min_pages, max_pages)
 
     def _fetch_memento(self, url: Any) -> Memento:
         try:
-            return self.wayback_client.get_memento(url=url, mode=Mode.view, exact=False, target_window=365*24*60*60)  # Allow fetching of the same page within the first year if broken archive
+            return self.wayback_client.get_memento(url=url, mode=Mode.view, exact=False, target_window=365 * 24 * 60 * 60)  # Allow fetching of the same page within the first year if broken archive
         except Exception as e:
             raise Exception(f"Error during memento playback: {e}")
 
@@ -351,7 +353,7 @@ class CompanyWebCrawler:
                 urls.append(href)
 
         # Exclude unwanted pages
-        filtered_urls = self.filter_urls(urls, min_pages=10, max_pages=20)
+        filtered_urls = self.filter_urls(urls, min_pages=15, max_pages=50)
 
         # Scrape the internal links
         for _ in range(max_depth):
@@ -439,11 +441,11 @@ class CompanyWebCrawler:
                 process_iframes=False,
                 check_robots_txt=True,
                 stream=False,
-                wait_until="domcontentloaded",
-                page_timeout=30_000,
-                delay_before_return_html=0.2,
-                mean_delay=0.2,
-                max_range=0.5,
+                wait_until="networkidle",
+                page_timeout=35_000,
+                delay_before_return_html=0.7,
+                mean_delay=0.3,
+                max_range=0.6,
             )
 
             results = await crawler.arun_many(urls, config=config)

@@ -6,7 +6,7 @@ from langchain.text_splitter import MarkdownHeaderTextSplitter, RecursiveCharact
 
 class SimpleSplitter:
 
-    def __init__(self, headers_to_split_on=None, chunk_size=2560, chunk_overlap=128, **kwargs):
+    def __init__(self, headers_to_split_on=None, chunk_size=2560, chunk_overlap=256, **kwargs):
         """Initializes the SimpleSplitter with markdown and recursive character text splitters.
 
         Args:
@@ -15,7 +15,7 @@ class SimpleSplitter:
             chunk_overlap (int): Number of overlapping characters between chunks.
             **kwargs: Additional keyword arguments passed to the recursive splitter.
         """
-        headers_to_split_on = headers_to_split_on or [("#", "Header 1")]
+        headers_to_split_on = headers_to_split_on or [("#", "Header 1"), ("##", "Header 2")]  # Default is to split on the first two header levels
         self.markdown_splitter = MarkdownHeaderTextSplitter(
             headers_to_split_on=headers_to_split_on,
             strip_headers=False
@@ -104,7 +104,7 @@ class EmbeddingHandler:
         """
         return self.splitter.split_text(text)
 
-    def embed(self, documents: list[str], prefix: None|str = None) -> list[list[float]]:
+    def embed(self, documents: list[str], prefix: None | str = None) -> list[list[float]]:
         """Computes embeddings for a list of documents using the bi-encoder with optional an optional test prefix.
 
         Args:
@@ -146,7 +146,7 @@ class EmbeddingHandler:
         return (weights * embeddings).sum(dim=0)
 
     @staticmethod
-    def whitening_k(embeddings: torch.Tensor, k: int|None = None, eps: float = 1e-5):
+    def whitening_k(embeddings: torch.Tensor, k: int | None = None, eps: float = 1e-5):
         """Performs Whitening-k (dimensionality-reduced whitening) on embeddings based on the algorithm proposed by su et al. (2021).
 
         Args:

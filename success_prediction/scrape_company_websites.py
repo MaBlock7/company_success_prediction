@@ -196,7 +196,7 @@ async def _process_base_url(
     if not urls:
         urls = await bfs_search_urls(crawler, cwc, base_url, max_depth)
 
-    filtered_urls = cwc.filter_urls(urls, min_pages=10, max_pages=20)
+    filtered_urls = cwc.filter_urls(base_url, urls, min_pages=10, max_pages=40)
     results = await cwc.crawl(crawler, filtered_urls)
     return {ehraid: results}
 
@@ -251,7 +251,7 @@ async def _wayback_process(
 
 async def main(args):
 
-    crawling_shesh = int(time.time()) 
+    crawling_shesh = int(time.time())
     folder = 'wayback' if args.wayback else 'current'
     completed_ehraids_path = RAW_DATA_DIR / 'company_websites' / folder / 'completed_ehraids.txt'
     completed_ehraids = []
@@ -360,7 +360,6 @@ async def main(args):
 
     finally:
         await crawler.close()
-
 
 
 if __name__ == "__main__":
