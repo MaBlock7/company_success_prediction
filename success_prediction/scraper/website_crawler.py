@@ -67,7 +67,7 @@ class URLFilter:
         sorted_urls = sorted(((url, self._score_url(url)) for url in urls), key=lambda x: x[1], reverse=True)
         return [url for url, score in sorted_urls if score > 0]
 
-    def filter_urls(self, base_url: str, urls: list[str], min_pages: int = 15, max_pages: int = 50) -> list[str]:
+    def filter_urls(self, base_url: str, urls: list[str], min_pages: int = 10, max_pages: int = 40) -> list[str]:
         """Filters unwanted URLs based on language and specific keywords.
 
         Args:
@@ -210,8 +210,8 @@ class CompanyWebCrawler:
         self,
         base_url: str,
         urls: list[str],
-        min_pages: int = 15,
-        max_pages: int = 50
+        min_pages: int = 10,
+        max_pages: int = 40
     ) -> list[str]:
         return self.filter.filter_urls(base_url, urls, min_pages, max_pages)
 
@@ -442,8 +442,8 @@ class CompanyWebCrawler:
                 check_robots_txt=True,
                 stream=False,
                 wait_until="networkidle",
-                page_timeout=35_000,
-                delay_before_return_html=0.7,
+                page_timeout=30_000,
+                delay_before_return_html=0.5,
                 mean_delay=0.3,
                 max_range=0.6,
             )
