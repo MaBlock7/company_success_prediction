@@ -1,8 +1,14 @@
+from pathlib import Path
+from unidecode import unidecode
+import nltk
+from nltk.corpus import stopwords
+import numpy as np
 import torch
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
-from sentence_transformers import CrossEncoder
 from langchain.schema import Document
 from langchain.text_splitter import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
+from gensim.models.doc2vec import Doc2Vec, TaggedDocument
+from sentence_transformers import CrossEncoder
 
 
 class SimpleSplitter:
@@ -211,3 +217,78 @@ class EmbeddingHandler:
         embeddings_whitened = embeddings_centered @ W
 
         return embeddings_whitened
+
+
+class Doc2VecHandler:
+    """
+    Implements the doc2vec similarity estimation as described in Guzman & Li (2023)
+    """
+
+    def __init__(self, ehraid2data: dict, language: str = 'german'):
+        self.train_documents = None
+        self.doc2vec_model = None
+        self.ehraid2data = ehraid2data
+        self.language = language
+        self.stop_words = set(stopwords.words(language))
+
+    def _prepare_train_documents(self):
+        documents = []
+        print("Preprocessing and tokenizing documents...")
+        for ehraid, data in self.ehraid2data.items():
+            date = data['date']
+            text = ' '.join(data['text'])
+            # Limit text length for computational reasons
+            text = text[:400_000] if len(text) > 400_000 else text
+            documents.append(
+                (ehraid, date, self._preprocess_doc(text))
+            )
+        self.train_documents = documents
+
+    def _preprocess_doc(self, doc: str) -> list[str]:
+        tokens = nltk.tokenize.word_tokenize(doc.lower(), language=self.language)
+        return [unidecode(w) for w in tokens if not w.lower() in self.stop_words]
+
+    def train_doc2vec(self, vector_size: int = 300, window: int = 7, min_count: int = 3):
+        if self.train_documents is None:
+            self._prepare_train_documents()
+
+        tagged_documents = [TaggedDocument(doc, [ehraid]) for ehraid, _, doc in self.train_documents]
+
+        print("Training Doc2Vec model...")
+        model = Doc2Vec(
+            documents=tagged_documents,
+            vector_size=vector_size,
+            window=window,
+            min_count=min_count,
+            workers=4
+        )
+        print("Training complete.")
+        self.doc2vec_model = model
+
+    def save_doc2vec_model(self, folder_path: Path | str, filename: str = 'doc2vec') -> None:
+        """
+        Stores the trained doc2vec model in the given folder.
+        The file will be saved as <folder_path>/<filename>.model
+        """
+        if not isinstance(folder_path, Path):
+            folder_path = Path(folder_path)
+        if self.doc2vec_model is None:
+            raise ValueError("No trained doc2vec model to save.")
+        folder_path.mkdir(parents=True, exist_ok=True)
+        full_path = folder_path / f"{filename}_{self.language}.model"
+        self.doc2vec_model.save(str(full_path))
+        print(f"Doc2Vec model saved to {str(full_path)}")
+
+    def create_normalized_vectors(self) -> dict[int, dict]:
+        """
+        Returns a dictionary mapping each ehraid to a dict with its normalized doc2vec vector and date.
+        Example: {ehraid: {'vector': ..., 'date': ...}, ...}
+        """
+        vectors = self.doc2vec_model.dv.vectors
+        ehraids = list(self.doc2vec_model.dv.index_to_key)
+        mean_vec = np.mean(vectors, axis=0)
+        normed_vectors = vectors - mean_vec
+        return [
+            (ehraid, self.ehraid2data[ehraid]['date'], normed_vectors[i])
+            for i, ehraid in enumerate(ehraids)
+        ]

@@ -187,8 +187,8 @@ def main(args: argparse.Namespace):
 
     clients = Clients(
         md_cleaner=MarkdownCleaner(),
-        embedding_creator=EmbeddingHandler(model_name='intfloat/multilingual-e5-base'),
-        db_client=MilvusClient(uri=DATA_DIR / 'database' / 'websites.db')
+        embedding_creator=EmbeddingHandler(),
+        db_client=MilvusClient(uri=str(DATA_DIR / 'database' / 'websites.db'))
     )
 
     website_schema = CollectionSchema(fields=[
@@ -205,16 +205,16 @@ def main(args: argparse.Namespace):
     setup_database(clients.db_client, collection_name=args.collection_name, schema=website_schema, replace=args.replace or False)
 
     raw_files = [file for file in Path(RAW_DATA_DIR / 'company_websites' / 'current').iterdir() if str(file).endswith('.json.gz')]
-    # raw_files = [RAW_DATA_DIR / 'company_websites' / 'current' / '0_websites.json.gz']
 
-    for i, file in enumerate(raw_files):
-        run_pipeline(clients, idx=i, file_path=file, collection_name=args.collection_name)
+    offset = 172
+    for i, file in enumerate(raw_files[offset:]):
+        run_pipeline(clients, idx=i+offset, file_path=file, collection_name=args.collection_name)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        prog='RAGPipeline',
-        description='Processes the markdown and handles retrieval from the Milvus DB',
+        prog='ContextualEmbeddingPipeline',
+        description='Creates chunked, contextual embeddings of the websites',
     )
     parser.add_argument('--collection_name', default='current_websites')
     parser.add_argument('--replace', action='store_true')
