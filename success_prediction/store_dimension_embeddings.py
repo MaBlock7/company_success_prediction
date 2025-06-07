@@ -8,8 +8,10 @@ import pandas as pd
 import torch
 from pymilvus import MilvusClient, CollectionSchema, FieldSchema, DataType
 from pymilvus.client.types import ExtraList
-from success_prediction.rag_components.embeddings import EmbeddingHandler
-from success_prediction.config import DATA_DIR, RAW_DATA_DIR, PROCESSED_DATA_DIR
+from rag_components.embeddings import EmbeddingHandler
+from rag_components.config import DIM2QUERY
+from utils.helper_functions import cosine_sim
+from config import DATA_DIR, RAW_DATA_DIR, PROCESSED_DATA_DIR
 
 
 @dataclass
@@ -18,47 +20,23 @@ class Clients:
     db_client: MilvusClient
 
 
-DIM2QUERY = {
-    "Value Proposition & Innovation": [
-        "What solutions, services, or products does the company provide to customers?",
-        "What products and services does the company advertise on its website?",
-        "Which innovative features or technologies are highlighted in the company's offerings?",
-        "What benefits or outcomes does the company promise or deliver through its solutions, services, products, or platforms?",
-        "How does the company differentiate its products or services from competitors, and what specific customer needs are addressed?"
-    ],
-    "Purpose & Responsibility": [
-        "What is the stated mission, purpose, or long-term vision of the company?",
-        "Which ethical, social, or environmental commitments does the company emphasize?",
-        "Does the company value sustainability, diversity, inclusion, or in general ESG-related goals?",
-        "What values or principles guide the company's operations and decisions?",
-        "Does the company participate in any charitable initiatives, community outreach, or global impact programs?"
-    ],
-    "Leadership & People": [
-        "Who are the founders or key leaders of the company, and what roles do they hold?",
-        "What are the professional backgrounds or credentials of the company's executive team?",
-        "Who makes up the leadership team, and how is the company structured in terms of people and roles?",
-        "What experience or expertise does the management bring to the company?",
-        "Are there biographies or personal stories of team members or executives available on the website?"
-    ]
-}
-
-
-def cosine_sim(a, b):
-    return (a @ b) / (np.linalg.norm(a, axis=1) * np.linalg.norm(b) + 1e-9)
-
-
-def ensemble_top_passages(company_data, query_embeddings, top_k_per_query=15, final_top_k=15):
+def ensemble_top_passages(
+    company_data: list[dict],
+    query_embeddings: list[np.ndarray],
+    top_k_per_query: int = 15,
+    final_top_k: int = 15
+) -> list[dict]:
     """
-    Returns the passages that appear most frequently in the top-k across query ensemble.
+    Returns the passages that appear most frequently in the top-k across a query ensemble.
 
-    Parameters:
-        company_data: List of dicts with fields 'id', 'embedding_passage', 'embedding_query', 'text', 'url'
-        query_embeddings: List of embedded queries for the dimension
-        top_k_per_query: Number of top results to keep for each query
-        final_top_k: Final number of consensus passages to return
+    Args:
+        company_data (list of dict): List of passages, each dict must have 'id', 'embedding_passage', etc.
+        query_embeddings (list of np.ndarray): List of embedded queries for the dimension.
+        top_k_per_query (int): Number of top results to keep for each query.
+        final_top_k (int): Final number of consensus passages to return.
 
     Returns:
-        List of dicts: top passages by consensus frequency
+        list of dict: Top passages by consensus frequency.
     """
     passage_scores = defaultdict(list)
 
@@ -74,7 +52,7 @@ def ensemble_top_passages(company_data, query_embeddings, top_k_per_query=15, fi
 
         for passage in top_k:
             passage_scores[passage['id']].append((passage['score'], passage))
-    
+
     frequency_counter = Counter({pid: len(scores) for pid, scores in passage_scores.items()})
     # Sort by frequency (how often in top 15), then by best score (descending)
     sorted_passages = sorted(
@@ -87,8 +65,21 @@ def ensemble_top_passages(company_data, query_embeddings, top_k_per_query=15, fi
     return final_passages
 
 
-def ensemble_rerank(clients: Clients, top_n_entries, query_texts):
+def ensemble_rerank(
+    clients: Clients,
+    top_n_entries: list[dict],
+    query_texts: list[str]
+) -> list[dict]:
     """
+    Reranks entries using a cross-encoder, assigning an attention score based on relevance to queries.
+
+    Args:
+        clients (Clients): Object with embedding_creator and db_client.
+        top_n_entries (list of dict): Passages to rerank.
+        query_texts (list of str): List of queries.
+
+    Returns:
+        list of dict: Entries with attention_score, filtered to z-score >= 0 and sorted descending.
     """
     for entry in top_n_entries:
         pairs = [(query, entry['text']) for query in query_texts]
@@ -104,8 +95,28 @@ def ensemble_rerank(clients: Clients, top_n_entries, query_texts):
     z_scores = (scores - np.mean(scores)) / np.std(scores)
     return [entry for z_score, entry in zip(z_scores, sorted_entries) if z_score >= 0]
 
-def get_dimension_vec(clients: Clients, dimension: str, company_data: ExtraList, dim2embedding: dict, dim2query: dict):
+
+def get_dimension_vec(
+    clients: Clients,
+    dimension: str,
+    company_data: ExtraList,
+    dim2embedding: dict,
+    dim2query: dict
+) -> tuple[list[dict], torch.Tensor]:
     """
+    For a company and a strategy dimension, finds most relevant passages and computes an aggregate vector.
+
+    Args:
+        clients (Clients): Object holding embedding creator and DB client.
+        dimension (str): The strategy dimension to query.
+        company_data (ExtraList): List of company passages with embeddings.
+        dim2embedding (dict): Dictionary mapping dimensions to query embeddings.
+        dim2query (dict): Dictionary mapping dimensions to queries.
+
+    Returns:
+        Tuple:
+            - most_relevant (list of dict): Most relevant passages for the dimension.
+            - dim_vec (torch.Tensor): Aggregated vector for the dimension.
     """
     # Get top 15 based on cosine / IP similarity
     top_15 = ensemble_top_passages(
@@ -119,15 +130,32 @@ def get_dimension_vec(clients: Clients, dimension: str, company_data: ExtraList,
         top_n_entries=top_15,
         query_texts=dim2query[dimension]
     )
-    
+
     # combine the remaining into one vector by using the quasi attention score from the ensemble rerank
     # Use the embedding with 'query:' prefix since it is better for similarity comparisons
     dim_vec = clients.embedding_creator.waggregate_embeddings([torch.tensor(entry['embedding_query']) for entry in most_relevant], [entry['attention_score'] for entry in most_relevant])
     return most_relevant, dim_vec
 
 
-def create_dimension_vecs(clients: Clients, ehraids: list, dim2query: dict, dim2embedding: dict, **kwargs) -> None:
+def create_dimension_vecs(
+    clients: Clients,
+    ehraids: list[int],
+    dim2query: dict,
+    dim2embedding: dict,
+    **kwargs
+) -> None:
     """
+    Computes, aggregates, and stores dimension vectors for all companies.
+
+    Args:
+        clients (Clients): Object holding embedding creator and DB client.
+        ehraids (list of int): List of company IDs.
+        dim2query (dict): Mapping of dimension to queries.
+        dim2embedding (dict): Mapping of dimension to embedded queries.
+        **kwargs: Optional keyword arguments, e.g., 'collection_name' for the database.
+
+    Side effects:
+        Saves results to disk and inserts embeddings into the database.
     """
     vec_results = []
     dates = []
@@ -143,14 +171,14 @@ def create_dimension_vecs(clients: Clients, ehraids: list, dim2query: dict, dim2
             most_relevant, dim_vec = get_dimension_vec(clients, dim, company_data, dim2embedding, dim2query)
             dim_vectors[dim]['entries'] = most_relevant
             dim_vectors[dim]['vectors'] = dim_vec
-        dates.append{}
+        dates.append(company_data[0]['date'])
         vec_results.append({ehraid: dim_vectors})
 
     sdg_references = pd.read_excel(RAW_DATA_DIR / 'synthetic_examples' / 'synthetic_corporate_responsibility.xlsx')
     sdg_embeddings = clients.embedding_creator.embed([sdg_references['content']], prefix='query:')
     sdg_vec = clients.embedding_creator.waggregate_embeddings(
         [torch.tensor(entry['embedding_query']) for entry in sdg_embeddings],
-        [1/len(sdg_embeddings) for _ in sdg_embeddings]  # Apply uniform weights for all embeddings
+        [1 / len(sdg_embeddings) for _ in sdg_embeddings]  # Apply uniform weights for all embeddings
     )
 
     vp_embeddings = torch.stack([values['Value Proposition & Innovation']['vectors'] for entry in vec_results for values in entry.values()])
@@ -177,9 +205,9 @@ def create_dimension_vecs(clients: Clients, ehraids: list, dim2query: dict, dim2
     sdg_vec_whitened_red = pr_plus_ref_whitened_red[-1]
 
     # Calculate the responsibility scores right here
-    pr_sim = cosine_sim(pr_embeddings.numpy(), sdg_vec.numpy())
-    pr_w_sim = cosine_sim(pr_whitened.numpy(), sdg_vec_whitened.numpy())
-    pr_w_red_sim = cosine_sim(pr_whitened_red.numpy(), sdg_vec_whitened_red.numpy())
+    pr_sim = cosine_sim(pr_embeddings.cpu().numpy(), sdg_vec.numpy())
+    pr_w_sim = cosine_sim(pr_whitened.cpu().numpy(), sdg_vec_whitened.cpu().numpy())
+    pr_w_red_sim = cosine_sim(pr_whitened_red.cpu().numpy(), sdg_vec_whitened_red.cpu().numpy())
 
     sim_df = pd.DataFrame({
         'ehraid': [int(ehraid) for ehraid in ehraids],
@@ -206,10 +234,10 @@ def create_dimension_vecs(clients: Clients, ehraids: list, dim2query: dict, dim2
             'pr_w_red': pr_w_red,
         }
         for ehraid, date, vp, lp, pr, vp_w, lp_w, pr_w, vp_w_red, lp_w_red, pr_w_red in zip(
-            ehraids, dates, 
-            vp_embeddings, pr_embeddings, lp_embeddings,
-            vp_whitened, pr_whitened, lp_whitened,
-            vp_whitened_red, pr_whitened_red, lp_whitened_red
+            ehraids, dates,
+            vp_embeddings, lp_embeddings, pr_embeddings,
+            vp_whitened, lp_whitened, pr_whitened,
+            vp_whitened_red, lp_whitened_red, pr_whitened_red
         )
     ]
 
@@ -217,7 +245,12 @@ def create_dimension_vecs(clients: Clients, ehraids: list, dim2query: dict, dim2
     print(f"Saved embeddings to database")
 
 
-def setup_database(client: MilvusClient, collection_name: str, schema: CollectionSchema, replace: bool) -> None:
+def setup_database(
+    client: MilvusClient,
+    collection_name: str,
+    schema: CollectionSchema,
+    replace: bool
+) -> None:
     """
     Sets up a Milvus collection for storing embedded documents.
 
@@ -226,6 +259,9 @@ def setup_database(client: MilvusClient, collection_name: str, schema: Collectio
         collection_name (str): Name of the collection to use/create.
         schema (CollectionSchema): Schema of the collection.
         replace (bool): Whether to drop and recreate the collection if it exists.
+
+    Side effects:
+        Creates or replaces a collection in the Milvus database.
     """
     if replace and client.has_collection(collection_name):
         client.drop_collection(collection_name)
@@ -238,17 +274,24 @@ def setup_database(client: MilvusClient, collection_name: str, schema: Collectio
         print(f"{collection_name} already exists!")
 
 
-def main(args: argparse.Namespace):
+def main(args: argparse.Namespace) -> None:
+    """
+    Main entry point for running the contextual embedding pipeline.
 
+    Args:
+        args (argparse.Namespace): Parsed command line arguments.
+
+    Side effects:
+        Loads data, creates database schema, computes embeddings, stores results.
+    """
     clients = Clients(
         embedding_creator=EmbeddingHandler(),
         db_client=MilvusClient(uri=str(DATA_DIR / 'database' / 'websites.db'))
     )
-    
+
     # Convert to list
     dim2embedding = {dimension: [clients.embedding_creator.embed([q], prefix='query:') for q in queries] for dimension, queries in DIM2QUERY.items()}
     clients.db_client.load_collection(collection_name='current_websites')
-
 
     website_schema = CollectionSchema(fields=[
         FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
@@ -286,4 +329,3 @@ if __name__ == '__main__':
     parser.add_argument('--replace', action='store_true')
     args = parser.parse_args()
     main(args)
-    

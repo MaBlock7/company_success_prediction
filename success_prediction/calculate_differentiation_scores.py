@@ -4,8 +4,9 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 from pymilvus import MilvusClient
-from success_prediction.rag_components.embeddings import EmbeddingHandler
-from success_prediction.config import DATA_DIR, RAW_DATA_DIR
+from rag_components.embeddings import EmbeddingHandler
+from config import DATA_DIR, RAW_DATA_DIR, PROCESSED_DATA_DIR
+from utils.helper_functions import cosine_sim
 
 
 @dataclass
@@ -14,11 +15,31 @@ class Clients:
     db_client: MilvusClient
 
 
-def cosine_sim(a, b):
-    return (a @ b) / (np.linalg.norm(a, axis=1) * np.linalg.norm(b) + 1e-9)
+def calculate_diff_scores(
+    clients: Clients,
+    collection_name: str,
+    output_fields: list[str],
+    ehraid: int,
+    top_k: int = 5
+) -> tuple[dict[str, list[dict]], dict[str, dict[str, float | None]]]:
+    """
+    Calculates differentiation scores between a target company and its top competitors
+    for selected embedding fields.
 
+    Args:
+        clients (Clients): The embedding and DB client wrapper.
+        collection_name (str): Name of the collection in Milvus to search.
+        output_fields (list of str): Fields for which to compute differentiation (e.g., embeddings).
+        ehraid (int): Unique identifier for the target company.
+        top_k (int, optional): Number of top competitors to consider (default: 5).
 
-def calculate_diff_scores(clients: Clients, collection_name: str, output_fields: list[str], ehraid: int, top_k: int = 5) -> tuple[dict, dict]:
+    Returns:
+        tuple:
+            - competitors (dict): For each output field, a list of top competitor documents (as dicts).
+            - diff_scores (dict): For 'value_proposition' and 'leadership', a dict mapping field to mean diff score.
+              Leadership differentiation is None if not applicable for a field.
+        If the target company is not found, returns (None, None).
+    """
     additional_fields = [f.replace('vp', 'lp') for f in output_fields if f.startswith('vp')] if 'vp' in output_fields else []
     query_result = clients.db_client.query(
         collection_name=collection_name,
@@ -61,13 +82,24 @@ def calculate_diff_scores(clients: Clients, collection_name: str, output_fields:
                 lp_diff += 1 - cosine_sim(lp_target_vec, lp_comp_vec)
             diff_scores['leadership'][field] = lp_diff / top_k
         else:
-            diff_scores['leadership'][field] = None 
+            diff_scores['leadership'][field] = None
 
     return competitors, diff_scores
 
 
-def main(args: argparse.Namespace):
+def main(args: argparse.Namespace) -> None:
+    """
+    Main pipeline for calculating differentiation scores for all companies.
 
+    Loads data, creates index on embedding fields, and computes competitor
+    differentiation metrics for each company in the dataset.
+
+    Args:
+        args (argparse.Namespace): Command-line arguments including score_type.
+
+    Side effects:
+        Saves differentiation scores to a csv file.
+    """
     clients = Clients(
         embedding_creator=EmbeddingHandler(),
         db_client=MilvusClient(uri=str(DATA_DIR / 'database' / 'websites.db'))
@@ -88,8 +120,26 @@ def main(args: argparse.Namespace):
             index_params=index_params,
         )
 
+    results = []
     for ehraid in tqdm(training_data['ehraid']):
         competitors, diff_scores = calculate_diff_scores(clients, args.score_type, index_fields, ehraid)
+        if competitors is None or diff_scores is None:
+            continue
+
+        for score_type in diff_scores:  # 'value_proposition' or 'leadership'
+            for field, score in diff_scores[score_type].items():
+                if score is None:
+                    continue
+                results.append({
+                    "ehraid": ehraid,
+                    "competitors": competitors,
+                    "score_type": score_type,
+                    "field": field,
+                    "score": score
+                })
+
+    df_scores = pd.DataFrame(results)
+    df_scores.to_csv(PROCESSED_DATA_DIR / f'differentiation_scores_{args.score_type}.csv', index=False)
 
 
 if __name__ == '__main__':
