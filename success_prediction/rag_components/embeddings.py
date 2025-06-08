@@ -1,5 +1,6 @@
 from pathlib import Path
 from unidecode import unidecode
+from typing import Optional
 import nltk
 from nltk.corpus import stopwords
 import numpy as np
@@ -189,7 +190,12 @@ class EmbeddingHandler:
         return (weights * embeddings).sum(dim=0)
 
     @staticmethod
-    def whitening_k(embeddings: torch.Tensor, k: int | None = None, eps: float = 1e-5):
+    def whitening_k(
+        embeddings: torch.Tensor,
+        k: Optional[int] = None,
+        eps: float = 1e-9,
+        reference: Optional[torch.Tensor] = None
+        ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Performs Whitening-k (dimensionality-reduced whitening) on embeddings based on the algorithm proposed by su et al. (2021).
 
         Args:
@@ -216,7 +222,15 @@ class EmbeddingHandler:
         # 4: Apply transformation to each embedding
         embeddings_whitened = embeddings_centered @ W
 
-        return embeddings_whitened
+        # 5 (optional): Apply same transform to reference vector
+        ref_whitened = None
+        if reference is not None:
+            if reference.ndim == 1:
+                reference = reference.unsqueeze(0)
+            reference_centered = reference - mu
+            ref_whitened = (reference_centered @ W).squeeze(0)
+
+        return embeddings_whitened, ref_whitened
 
 
 class Doc2VecHandler:

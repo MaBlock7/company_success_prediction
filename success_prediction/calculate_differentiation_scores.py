@@ -62,23 +62,22 @@ def calculate_diff_scores(
             collection_name=collection_name,
             data=[query_vec],
             anns_field=field,
-            param={'metric_type': 'COSINE', 'params': {'nprobe': 16}},
-            limit=top_k + 1,
-            output_fields=['ehraid'] + [leadership_field] if leadership_field else ['ehraid'],
+            params={"metric_type": "COSINE"},
+            limit=top_k,
+            output_fields = ['ehraid'] + ([leadership_field] if leadership_field else []),
             filter=f"ehraid != {ehraid}"
         )
-        top_comps = k_closest[0][:top_k]
-        competitors[field] = top_comps
+        competitors[field] = k_closest[0]
 
         # Value proposition differentiation
-        diff_scores['value_proposition'][field] = np.mean([1 - entry['score'] for entry in top_comps])
+        diff_scores['value_proposition'][field] = np.mean([1 - entry['distance'] for entry in k_closest[0]])
 
         # Leadership differentiation only if applicable
         if leadership_field:
             lp_target_vec = np.array(target[leadership_field])
             lp_diff = 0
-            for entry in top_comps:
-                lp_comp_vec = np.array(entry[leadership_field])
+            for entry in k_closest[0]:
+                lp_comp_vec = np.array(entry['entity'][leadership_field])
                 lp_diff += 1 - cosine_sim(lp_target_vec, lp_comp_vec)
             diff_scores['leadership'][field] = lp_diff / top_k
         else:
@@ -106,7 +105,7 @@ def main(args: argparse.Namespace) -> None:
     )
     clients.db_client.load_collection(collection_name=args.score_type)
 
-    training_data = pd.read_csv(RAW_DATA_DIR / 'company_sample' / 'company_sample_website.csv')  # Load all ehraids and dates from the Milvus db
+    training_data = pd.read_csv(RAW_DATA_DIR / 'company_sample' / 'sample_2022-04-01_website.csv')  # Load all ehraids and dates from the Milvus db
 
     index_fields = ['vp', 'vp_w', 'vp_w_red'] if args.score_type == 'strategy_dimensions' else ['doc2vec_embeddings']
     for field in index_fields:
@@ -116,7 +115,7 @@ def main(args: argparse.Namespace) -> None:
             'index_type': 'FLAT',
         }]
         clients.db_client.create_index(
-            collection_name='dimension_vectors',
+            collection_name=args.score_type,
             index_params=index_params,
         )
 
