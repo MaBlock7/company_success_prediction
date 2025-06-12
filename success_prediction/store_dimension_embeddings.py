@@ -1,6 +1,8 @@
 import argparse
+import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from math import ceil
 from tqdm import tqdm
 
 import numpy as np
@@ -8,6 +10,7 @@ import pandas as pd
 import torch
 from pymilvus import MilvusClient, CollectionSchema, FieldSchema, DataType
 from pymilvus.client.types import ExtraList
+from pymilvus.exceptions import MilvusException
 from rag_components.embeddings import EmbeddingHandler
 from rag_components.config import DIM2QUERY
 from utils.helper_functions import cosine_sim
@@ -144,6 +147,65 @@ def get_dimension_vec(
     return most_relevant, dim_vec
 
 
+def safe_query(client, collection_name, ehraid, output_fields):
+    try:
+        # First attempt: no limit
+        return client.query(
+            collection_name=collection_name,
+            filter=f"ehraid == {ehraid}",
+            output_fields=output_fields
+        )
+    except MilvusException as e:
+        if "query results exceed the limit size" in str(e):
+            print(f"[Retry] Query too large for ehraid={ehraid}. Retrying with limit=100.")
+            try:
+                return client.query(
+                    collection_name=collection_name,
+                    filter=f"ehraid == {ehraid}",
+                    output_fields=output_fields,
+                    limit=100
+                )
+            except MilvusException as e2:
+                print(f"[Fail] Even limited query failed for ehraid={ehraid}: {e2}")
+                return []
+        else:
+            print(f"[Error] Milvus query failed for ehraid={ehraid}: {e}")
+            return []
+
+
+def safe_batch_insert(client: Clients, collection_name: str, data, batch_size=500, max_retries=3, sleep_seconds=5):
+    """
+    Inserts data into Milvus in safe batches to avoid exceeding gRPC message size.
+
+    Args:
+        client (MilvusClient): Initialized client.
+        collection_name (str): Name of the collection.
+        data (list of dict): Data to insert.
+        batch_size (int): Number of rows per batch.
+        max_retries (int): Number of retry attempts for each batch.
+        sleep_seconds (int): Wait time between retries.
+    """
+    total_batches = ceil(len(data) / batch_size)
+    print(f"Inserting data in {total_batches} batches...")
+
+    for i in range(total_batches):
+        batch = data[i * batch_size: (i + 1) * batch_size]
+        success = False
+        attempt = 0
+        while not success and attempt < max_retries:
+            try:
+                client.insert(collection_name=collection_name, data=batch)
+                success = True
+                print(f"[SUCCESS] Batch {i+1}/{total_batches} inserted successfully.")
+            except Exception as e:
+                attempt += 1
+                print(f"[RETRY] Failed to insert batch {i+1}/{total_batches} (attempt {attempt}): {e}")
+                if attempt < max_retries:
+                    time.sleep(sleep_seconds)
+        if not success:
+            print(f"[FAIL] Skipping batch {i+1}/{total_batches} after {max_retries} failed attempts.")
+
+
 def create_dimension_vecs(
     clients: Clients,
     ehraids: list[int],
@@ -168,23 +230,28 @@ def create_dimension_vecs(
     dates = []
     completed_ehraids = []
     for ehraid in tqdm(ehraids, desc='Aggregating embeddings'):
+        try:
+            company_data = safe_query(
+                client=clients.db_client,
+                collection_name='current_websites',
+                ehraid=ehraid,
+                output_fields=["ehraid", "date", "text", "embedding_passage", "embedding_query"]  # adjust as needed
+            )
 
-        company_data = clients.db_client.query(
-            collection_name='current_websites',
-            filter=f"ehraid == {ehraid}"
-        )
-        if not company_data:
-            continue
+            if not company_data:
+                continue
 
-        dim_vectors = {}
-        for dim in dim2query.keys():
-            dim_vectors[dim] = {}
-            most_relevant, dim_vec = get_dimension_vec(clients, dim, company_data, dim2embedding, dim2query)
-            dim_vectors[dim]['n_vecs'] = len(most_relevant)
-            dim_vectors[dim]['vectors'] = dim_vec
-        dates.append(company_data[0]['date'])
-        completed_ehraids.append(ehraid)
-        vec_results.append({ehraid: dim_vectors})
+            dim_vectors = {}
+            for dim in dim2query.keys():
+                dim_vectors[dim] = {}
+                most_relevant, dim_vec = get_dimension_vec(clients, dim, company_data, dim2embedding, dim2query)
+                dim_vectors[dim]['n_vecs'] = len(most_relevant)
+                dim_vectors[dim]['vectors'] = dim_vec
+            dates.append(company_data[0]['date'])
+            completed_ehraids.append(ehraid)
+            vec_results.append({ehraid: dim_vectors})
+        except Exception as e:
+            print(e)
 
     sdg_references = pd.read_excel(RAW_DATA_DIR / 'synthetic_examples' / 'synthetic_corporate_responsibility.xlsx')
     sdg_embeddings = [clients.embedding_creator.embed([q], prefix='query:') for q in sdg_references['content']]
@@ -248,7 +315,12 @@ def create_dimension_vecs(
             'pr_w_red': pr_whitened_red[i],
         })
 
-    clients.db_client.insert(collection_name=kwargs.get('collection_name'), data=results)
+    safe_batch_insert(
+        client=clients.db_client,
+        collection_name=kwargs.get('collection_name'),
+        batch_size=10,
+        data=results
+    )
     print("Saved embeddings to database")
 
 
@@ -279,6 +351,7 @@ def setup_database(
             schema=schema)
     else:
         print(f"{collection_name} already exists!")
+
 
 
 def main(args: argparse.Namespace) -> None:
