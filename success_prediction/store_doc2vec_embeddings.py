@@ -33,7 +33,7 @@ def load_raw_file(file_path: Path) -> dict:
         return json.load(f)
 
 
-def collect_training_data(clients: Clients, file_path: Path) -> dict[str, dict[int, dict]]:
+def collect_training_data(clients: Clients, file_path: Path, idx: int) -> dict[str, dict[int, dict]]:
     """
     Collects the training data for the language specific doc2vec models.
 
@@ -44,7 +44,7 @@ def collect_training_data(clients: Clients, file_path: Path) -> dict[str, dict[i
     raw_json = load_raw_file(file_path)
 
     training_data = {'de': {}, 'fr': {}, 'it': {}, 'en': {}}
-    for ehraid, urls2attributes in tqdm(raw_json.items()):
+    for ehraid, urls2attributes in tqdm(raw_json.items(), desc=f'Process websites file {idx}'):
 
         for _, attributes in urls2attributes.items():
             markdown = attributes.get('markdown')
@@ -79,7 +79,7 @@ def save_to_collection(clients: Clients, training_data: Path, **kwargs) -> None:
         code2lang = {'de': 'german', 'fr': 'french', 'it': 'italian', 'en': 'english'}
         doc2vec = Doc2VecHandler(ehraid2data, language=code2lang[lang_code])
         doc2vec.train_doc2vec()
-        doc2vec.save_doc2vec_model(folder_path=MODELS_DIR / 'doc2vec')
+        doc2vec.save_doc2vec_model(folder_path=kwargs.get('out_folder'))
         output = doc2vec.create_normalized_vectors()
 
         processed_files.extend([
@@ -123,6 +123,9 @@ def main(args: argparse.Namespace):
         db_client=MilvusClient(uri=str(DATA_DIR / 'database' / 'websites.db'))
     )
 
+    target_collection_name = f'{args.source_zipped_websites}_doc2vec'
+    print(f'Setting up database {target_collection_name}...')
+
     website_schema = CollectionSchema(fields=[
         FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
         FieldSchema(name="ehraid", dtype=DataType.INT64),
@@ -130,17 +133,18 @@ def main(args: argparse.Namespace):
         FieldSchema(name="language", dtype=DataType.VARCHAR, max_length=5),
         FieldSchema(name="doc2vec_embedding", dtype=DataType.FLOAT_VECTOR, dim=300),
     ])
-    setup_database(clients.db_client, collection_name=args.collection_name, schema=website_schema, replace=args.replace or False)
+    setup_database(clients.db_client, collection_name=target_collection_name, schema=website_schema, replace=args.replace or False)
+    print('Database setup successful')
 
-    raw_files = [file for file in Path(RAW_DATA_DIR / 'company_websites' / 'current').iterdir() if str(file).endswith('.json.gz')]
-    # raw_files = raw_files[:5]
+    raw_files = [file for file in Path(RAW_DATA_DIR / 'company_websites' / args.source_zipped_websites).iterdir() if str(file).endswith('.json.gz')]
+
     all_data = {'de': {}, 'fr': {}, 'it': {}, 'en': {}}
-    for file in raw_files:
-        data = collect_training_data(clients, file_path=file)
+    for i, file in enumerate(raw_files):
+        data = collect_training_data(clients, file_path=file, idx=i)
         for lang in all_data.keys():
             all_data[lang].update(data[lang])
 
-    save_to_collection(clients, training_data=all_data, collection_name=args.collection_name)
+    save_to_collection(clients, training_data=all_data, collection_name=target_collection_name, out_folder=MODELS_DIR / 'doc2vec' / args.source_zipped_websites)
 
 
 if __name__ == '__main__':
@@ -148,7 +152,16 @@ if __name__ == '__main__':
         prog='Doc2VecPipeline',
         description='Creates doc2vec embeddings of the full websites',
     )
-    parser.add_argument('--collection_name', default='doc2vec')
-    parser.add_argument('--replace', action='store_true')
+    parser.add_argument(
+        '--source_zipped_websites',
+        type=str,
+        choices=['current', 'wayback'],
+        help='Name of the folder where the zipped scraped website content lives.'
+    )
+    parser.add_argument(
+        '--replace',
+        action='store_true',
+        help='If set, replaces the existing target database.'
+    )
     args = parser.parse_args()
     main(args)

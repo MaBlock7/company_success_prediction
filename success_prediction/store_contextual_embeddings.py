@@ -101,7 +101,7 @@ def run_pipeline(clients: Clients, idx: int, file_path: Path, **kwargs) -> None:
     processed_files = []
     email_addresses, social_media = {}, {}
 
-    for ehraid, urls2attributes in tqdm(raw_json.items()):
+    for ehraid, urls2attributes in tqdm(raw_json.items(), desc=f'Process websites file {idx}'):
         email_addresses[ehraid] = {'emails': set()}
         social_media[ehraid] = {k: set() for k in ['linkedin', 'instagram', 'facebook', 'tiktok', 'youtube', 'x']}
 
@@ -159,7 +159,7 @@ def run_pipeline(clients: Clients, idx: int, file_path: Path, **kwargs) -> None:
     clients.db_client.insert(collection_name=kwargs.get('collection_name'), data=processed_files)
 
     store_links(RAW_DATA_DIR / 'company_websites' / 'current' / 'contact_info' / f'emails_{idx}.json', email_addresses)
-    store_links(RAW_DATA_DIR / 'company_websites' / 'current' / 'contact_info' /  f'social_media_{idx}.json', social_media)
+    store_links(RAW_DATA_DIR / 'company_websites' / 'current' / 'contact_info' / f'social_media_{idx}.json', social_media)
 
 
 def setup_database(client: MilvusClient, collection_name: str, schema: CollectionSchema, replace: bool) -> None:
@@ -191,6 +191,9 @@ def main(args: argparse.Namespace):
         db_client=MilvusClient(uri=str(DATA_DIR / 'database' / 'websites.db'))
     )
 
+    target_collection_name = f'{args.source_zipped_websites}_websites'
+    print(f'Setting up database {target_collection_name}...')
+
     website_schema = CollectionSchema(fields=[
         FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
         FieldSchema(name="ehraid", dtype=DataType.INT64),
@@ -202,13 +205,13 @@ def main(args: argparse.Namespace):
         FieldSchema(name="embedding_passage", dtype=DataType.FLOAT_VECTOR, dim=768),
         FieldSchema(name="embedding_query", dtype=DataType.FLOAT_VECTOR, dim=768),
     ])
-    setup_database(clients.db_client, collection_name=args.collection_name, schema=website_schema, replace=args.replace or False)
+    setup_database(clients.db_client, collection_name=target_collection_name, schema=website_schema, replace=args.replace or False)
+    print('Database setup successful')
 
-    raw_files = [file for file in Path(RAW_DATA_DIR / 'company_websites' / 'current').iterdir() if str(file).endswith('.json.gz')]
+    raw_files = [file for file in Path(RAW_DATA_DIR / 'company_websites' / args.source_zipped_websites).iterdir() if str(file).endswith('.json.gz')]
 
-    offset = 172
-    for i, file in enumerate(raw_files[offset:]):
-        run_pipeline(clients, idx=i+offset, file_path=file, collection_name=args.collection_name)
+    for i, file in enumerate(raw_files):
+        run_pipeline(clients, idx=i, file_path=file, collection_name=target_collection_name)
 
 
 if __name__ == '__main__':
@@ -216,7 +219,16 @@ if __name__ == '__main__':
         prog='ContextualEmbeddingPipeline',
         description='Creates chunked, contextual embeddings of the websites',
     )
-    parser.add_argument('--collection_name', default='current_websites')
-    parser.add_argument('--replace', action='store_true')
+    parser.add_argument(
+        '--source_zipped_websites',
+        type=str,
+        choices=['current', 'wayback'],
+        help='Name of the folder where the zipped scraped website content lives.'
+    )
+    parser.add_argument(
+        '--replace',
+        action='store_true',
+        help='If set, replaces the existing target database.'
+    )
     args = parser.parse_args()
     main(args)

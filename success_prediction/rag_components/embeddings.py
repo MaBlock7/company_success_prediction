@@ -195,7 +195,7 @@ class EmbeddingHandler:
         k: Optional[int] = None,
         eps: float = 1e-9,
         reference: Optional[torch.Tensor] = None
-        ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
+    ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Performs Whitening-k (dimensionality-reduced whitening) on embeddings based on the algorithm proposed by su et al. (2021).
 
         Args:

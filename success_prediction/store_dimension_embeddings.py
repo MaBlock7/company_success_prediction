@@ -13,7 +13,7 @@ from pymilvus.client.types import ExtraList
 from pymilvus.exceptions import MilvusException
 from rag_components.embeddings import EmbeddingHandler
 from rag_components.config import DIM2QUERY
-from utils.helper_functions import cosine_sim
+from utils.helper_functions import cosine_sim, angular_distance_from_cosine
 from config import DATA_DIR, RAW_DATA_DIR, PROCESSED_DATA_DIR
 
 
@@ -196,14 +196,14 @@ def safe_batch_insert(client: Clients, collection_name: str, data, batch_size=50
             try:
                 client.insert(collection_name=collection_name, data=batch)
                 success = True
-                print(f"[SUCCESS] Batch {i+1}/{total_batches} inserted successfully.")
+                print(f"[SUCCESS] Batch {i + 1}/{total_batches} inserted successfully.")
             except Exception as e:
                 attempt += 1
-                print(f"[RETRY] Failed to insert batch {i+1}/{total_batches} (attempt {attempt}): {e}")
+                print(f"[RETRY] Failed to insert batch {i + 1}/{total_batches} (attempt {attempt}): {e}")
                 if attempt < max_retries:
                     time.sleep(sleep_seconds)
         if not success:
-            print(f"[FAIL] Skipping batch {i+1}/{total_batches} after {max_retries} failed attempts.")
+            print(f"[FAIL] Skipping batch {i + 1}/{total_batches} after {max_retries} failed attempts.")
 
 
 def create_dimension_vecs(
@@ -211,6 +211,8 @@ def create_dimension_vecs(
     ehraids: list[int],
     dim2query: dict,
     dim2embedding: dict,
+    source_collection_name: str,
+    target_collection_name: str,
     **kwargs
 ) -> None:
     """
@@ -221,11 +223,15 @@ def create_dimension_vecs(
         ehraids (list of int): List of company IDs.
         dim2query (dict): Mapping of dimension to queries.
         dim2embedding (dict): Mapping of dimension to embedded queries.
-        **kwargs: Optional keyword arguments, e.g., 'collection_name' for the database.
+        source_collection_name (str): DB collection to read the embeddings from.
+        target_collection_name (str): DB collection to store the dimension vectors in.
+        **kwargs: Optional keyword arguments.
 
     Side effects:
         Saves results to disk and inserts embeddings into the database.
     """
+    print(f"Reading company data from {source_collection_name}...")
+
     vec_results = []
     dates = []
     completed_ehraids = []
@@ -233,7 +239,7 @@ def create_dimension_vecs(
         try:
             company_data = safe_query(
                 client=clients.db_client,
-                collection_name='current_websites',
+                collection_name=source_collection_name,
                 ehraid=ehraid,
                 output_fields=["ehraid", "date", "text", "embedding_passage", "embedding_query"]  # adjust as needed
             )
@@ -281,9 +287,9 @@ def create_dimension_vecs(
     pr_whitened_red, sdg_vec_whitened_red = clients.embedding_creator.whitening_k(embeddings=pr_embeddings, k=300, reference=sdg_vec)
 
     # Calculate the responsibility scores right here
-    pr_sim = cosine_sim(pr_embeddings.cpu().numpy(), sdg_vec.numpy())
-    pr_w_sim = cosine_sim(pr_whitened.cpu().numpy(), sdg_vec_whitened.cpu().numpy())
-    pr_w_red_sim = cosine_sim(pr_whitened_red.cpu().numpy(), sdg_vec_whitened_red.cpu().numpy())
+    pr_sim = 1 - angular_distance_from_cosine(cosine_sim(pr_embeddings.cpu().numpy(), sdg_vec.numpy()))
+    pr_w_sim = 1 - angular_distance_from_cosine(cosine_sim(pr_whitened.cpu().numpy(), sdg_vec_whitened.cpu().numpy()))
+    pr_w_red_sim = 1 - angular_distance_from_cosine(cosine_sim(pr_whitened_red.cpu().numpy(), sdg_vec_whitened_red.cpu().numpy()))
 
     sim_df = pd.DataFrame({
         'ehraid': [int(ehraid) for ehraid in completed_ehraids],
@@ -292,7 +298,7 @@ def create_dimension_vecs(
         'pr_w_sdg_similarity': pr_w_sim,
         'pr_w_red_sdg_similarity': pr_w_red_sim,
     })
-    sim_df.to_csv(PROCESSED_DATA_DIR / 'responsibility_scores.csv', index=False)
+    sim_df.to_csv(PROCESSED_DATA_DIR / f'{source_collection_name}_responsibility_scores.csv', index=False)
     print("Saved similarity scores")
 
     results = []
@@ -317,11 +323,11 @@ def create_dimension_vecs(
 
     safe_batch_insert(
         client=clients.db_client,
-        collection_name=kwargs.get('collection_name'),
+        collection_name=target_collection_name,
         batch_size=10,
         data=results
     )
-    print("Saved embeddings to database")
+    print(f"Saved embeddings to {target_collection_name} database")
 
 
 def setup_database(
@@ -353,7 +359,6 @@ def setup_database(
         print(f"{collection_name} already exists!")
 
 
-
 def main(args: argparse.Namespace) -> None:
     """
     Main entry point for running the contextual embedding pipeline.
@@ -369,10 +374,13 @@ def main(args: argparse.Namespace) -> None:
         db_client=MilvusClient(uri=str(DATA_DIR / 'database' / 'websites.db'))
     )
 
+    target_collection_name = f'{str(args.source_collection_name).split('_')[0]}_strat2vec'
+    print(f'Setting up database {target_collection_name}...')
+
     # Convert to list
     dim2embedding = {dimension: [clients.embedding_creator.embed([q], prefix='query:') for q in queries] for dimension, queries in DIM2QUERY.items()}
     print('Successfully embedded dimension queries')
-    clients.db_client.load_collection(collection_name='current_websites')
+    clients.db_client.load_collection(collection_name=args.source_collection_name)
 
     website_schema = CollectionSchema(fields=[
         FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
@@ -391,17 +399,19 @@ def main(args: argparse.Namespace) -> None:
         FieldSchema(name="lp_w_red", dtype=DataType.FLOAT_VECTOR, dim=300),
         FieldSchema(name="pr_w_red", dtype=DataType.FLOAT_VECTOR, dim=300),
     ])
-    setup_database(clients.db_client, collection_name=args.collection_name, schema=website_schema, replace=args.replace or False)
+    setup_database(clients.db_client, collection_name=target_collection_name, schema=website_schema, replace=args.replace or False)
+    print('Database setup successful')
 
-    training_data = pd.read_csv(RAW_DATA_DIR / 'company_sample' / 'sample_2022-04-01_website.csv')  # Load all ehraids and dates from the Milvus db
-    print(f'Create dimension embeddings for {training_data['ehraid'].nunique()} companies...')
+    training_data = pd.read_csv(RAW_DATA_DIR / 'company_sample' / args.source_file)  # Load all ehraids of the sample
+    print(f'Company sample size: {training_data['ehraid'].nunique()}')
 
     create_dimension_vecs(
         clients,
         ehraids=training_data['ehraid'].tolist(),
         dim2query=DIM2QUERY,
         dim2embedding=dim2embedding,
-        collection_name=args.collection_name
+        source_collection_name=args.source_collection_name,
+        target_collection_name=target_collection_name
     )
 
 
@@ -410,7 +420,22 @@ if __name__ == '__main__':
         prog='ContextualEmbeddingPipeline',
         description='Creates chunked, contextual embeddings of the websites',
     )
-    parser.add_argument('--collection_name', default='strategy_dimensions')
-    parser.add_argument('--replace', action='store_true')
+    parser.add_argument(
+        '--source_file',
+        type=str,
+        default='until_2020/2020_sample_base_data.csv',
+        help='File name of the CSV company sample to create the dimension embeddings.'
+    )
+    parser.add_argument(
+        '--source_collection_name',
+        type=str,
+        choices=['current_websites', 'wayback_websites'],
+        help='Name of the collection to extract the contextualized embeddings from.'
+    )
+    parser.add_argument(
+        '--replace',
+        action='store_true',
+        help='If set, replaces the existing target database.'
+    )
     args = parser.parse_args()
     main(args)

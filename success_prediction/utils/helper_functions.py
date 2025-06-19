@@ -12,4 +12,12 @@ def cosine_sim(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: Cosine similarity scores of shape (n,).
     """
-    return (a @ b) / (np.linalg.norm(a, axis=1) * np.linalg.norm(b) + 1e-9)
+    if a.ndim == 1 and b.ndim == 1:
+        return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-9)
+    elif a.ndim == 2 and b.ndim == 2:
+        return (a @ b.T) / (np.linalg.norm(a, axis=1, keepdims=True) * np.linalg.norm(b, axis=1, keepdims=True) + 1e-9)
+    else:
+        raise ValueError(f"Incompatible shapes: a.shape={a.shape}, b.shape={b.shape}")
+
+def angular_distance_from_cosine(cos_sim):
+    return np.arccos(np.clip(cos_sim, -1, 1)) / np.pi
