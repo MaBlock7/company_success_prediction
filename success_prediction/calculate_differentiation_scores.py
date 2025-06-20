@@ -6,7 +6,7 @@ import pandas as pd
 from pymilvus import MilvusClient
 from rag_components.embeddings import EmbeddingHandler
 from config import DATA_DIR, RAW_DATA_DIR, PROCESSED_DATA_DIR
-from utils.helper_functions import cosine_sim, angular_distance_from_cosine
+from utils.helper_functions import cosine_sim
 
 
 @dataclass
@@ -70,12 +70,7 @@ def calculate_diff_scores(
         competitors[field] = [{'ehraid': entry['entity']['ehraid'], 'distance': entry['distance'], 'language': entry['entity'].get('language', 'multilingual')} for entry in k_closest[0]]
 
         # Value proposition differentiation
-        if field == 'doc2vec_embedding':
-            # For doc2vec use 1-cosine_sim
-            diff_scores['value_proposition'][field] = np.mean([1 - entry['distance'] for entry in k_closest[0]])
-        else:
-            # For dimension vecs use angular diff for nicer interpretability
-            diff_scores['value_proposition'][field] = np.mean([angular_distance_from_cosine(entry['distance']) for entry in k_closest[0]])
+        diff_scores['value_proposition'][field] = np.mean([1 - entry['distance'] for entry in k_closest[0]])
 
         # Leadership differentiation only if applicable
         if leadership_field:
@@ -83,8 +78,7 @@ def calculate_diff_scores(
             lp_diff = 0
             for entry in k_closest[0]:
                 lp_comp_vec = np.array(entry['entity'][leadership_field])
-                cosine_similarity = cosine_sim(lp_target_vec, lp_comp_vec)
-                lp_diff += angular_distance_from_cosine(cosine_similarity)
+                lp_diff += 1 - cosine_sim(lp_target_vec, lp_comp_vec)
             diff_scores['leadership'][leadership_field] = lp_diff / top_k
         else:
             diff_scores['leadership'][leadership_field] = None

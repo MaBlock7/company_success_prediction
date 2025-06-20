@@ -13,7 +13,7 @@ from pymilvus.client.types import ExtraList
 from pymilvus.exceptions import MilvusException
 from rag_components.embeddings import EmbeddingHandler
 from rag_components.config import DIM2QUERY
-from utils.helper_functions import cosine_sim, angular_distance_from_cosine
+from utils.helper_functions import cosine_sim
 from config import DATA_DIR, RAW_DATA_DIR, PROCESSED_DATA_DIR
 
 
@@ -287,9 +287,9 @@ def create_dimension_vecs(
     pr_whitened_red, sdg_vec_whitened_red = clients.embedding_creator.whitening_k(embeddings=pr_embeddings, k=300, reference=sdg_vec)
 
     # Calculate the responsibility scores right here
-    pr_sim = 1 - angular_distance_from_cosine(cosine_sim(pr_embeddings.cpu().numpy(), sdg_vec.numpy()))
-    pr_w_sim = 1 - angular_distance_from_cosine(cosine_sim(pr_whitened.cpu().numpy(), sdg_vec_whitened.cpu().numpy()))
-    pr_w_red_sim = 1 - angular_distance_from_cosine(cosine_sim(pr_whitened_red.cpu().numpy(), sdg_vec_whitened_red.cpu().numpy()))
+    pr_sim = cosine_sim(pr_embeddings.cpu().numpy(), sdg_vec.numpy())
+    pr_w_sim = cosine_sim(pr_whitened.cpu().numpy(), sdg_vec_whitened.cpu().numpy())
+    pr_w_red_sim = cosine_sim(pr_whitened_red.cpu().numpy(), sdg_vec_whitened_red.cpu().numpy())
 
     sim_df = pd.DataFrame({
         'ehraid': [int(ehraid) for ehraid in completed_ehraids],

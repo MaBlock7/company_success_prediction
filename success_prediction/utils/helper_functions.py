@@ -19,5 +19,17 @@ def cosine_sim(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     else:
         raise ValueError(f"Incompatible shapes: a.shape={a.shape}, b.shape={b.shape}")
 
-def angular_distance_from_cosine(cos_sim):
+def angular_distance_from_cosine(cos_sim: np.ndarray) -> np.ndarray:
+    """
+    Convert cosine similarity values to angular distance in [0, 1].
+
+    Angular distance is defined as:
+        arccos(cos_sim) / pi
+
+    Args:
+        cos_sim (np.ndarray): Cosine similarity values (can be scalar or array-like).
+
+    Returns:
+        np.ndarray: Angular distance values in [0, 1], where 0 means identical direction, 1 means opposite direction.
+    """
     return np.arccos(np.clip(cos_sim, -1, 1)) / np.pi
