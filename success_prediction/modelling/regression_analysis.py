@@ -69,6 +69,9 @@ class CoefficientAnalyser:
         Returns:
             Filtered DataFrame with collapsed rare categories and no-variation groups dropped.
         """
+        if not cat_controls:
+            return df
+
         for col in cat_controls:
             df[col] = df[col].astype(str)
             vc = df[col].value_counts()
@@ -204,8 +207,9 @@ class CoefficientAnalyser:
                 reg_df = self.collapse_and_drop_sparse(reg_df, target, cat_controls)
 
                 # Drop perfect separation categories
-                for control in cat_controls:
-                    reg_df = self.drop_perfect_separation(reg_df, target, control)
+                if cat_controls:
+                    for control in cat_controls:
+                        reg_df = self.drop_perfect_separation(reg_df, target, control)
 
                 # Build formula
                 terms = list(score_set)

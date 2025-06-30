@@ -25,6 +25,28 @@ OTHER_CONTROLS = [c for c in LOGREG_BINARY_FEATURES + LOGREG_CONTINUOUS_FEATURES
 
 EXPERIMENT_SETUP = [
     {
+        'title': 'No FEs',
+        'targets': [
+            'target_inno_subsidy',
+            'target_non_gov_investment',
+            'target_acquisition',
+            'target_inv_exit'
+        ],
+        'score_cols': [
+            'founding_doc2vec_diff',
+            ['founding_core_diff_pca', 'founding_pr_sdg_similarity'],
+            ['founding_core_diff_w_pca', 'founding_pr_w_sdg_similarity'],
+            ['founding_core_diff_w_red_pca', 'founding_pr_w_red_sdg_similarity'],
+            'current_doc2vec_diff',
+            ['current_core_diff_pca', 'current_pr_sdg_similarity'],
+            ['current_core_diff_w_pca', 'current_pr_w_sdg_similarity'],
+            ['current_core_diff_w_red_pca', 'current_pr_w_red_sdg_similarity']
+        ],
+    },
+]
+
+"""
+    {
         'title': 'Year FEs',
         'targets': [
             ('target_inno_subsidy', 'target_non_gov_investment', 'target_acquisition'),
@@ -114,8 +136,7 @@ EXPERIMENT_SETUP = [
         ],
         'cat_controls': ['founding_year', 'division_1_label', 'canton_id'],
     },
-]
-
+"""
 
 def run_experiment():
 
@@ -159,33 +180,46 @@ def run_experiment():
     score_cols = [
         'founding_doc2vec_diff',
         'current_doc2vec_diff',
+        'founding_pr_sdg_similarity',
         'founding_pr_w_sdg_similarity',
         'founding_pr_w_red_sdg_similarity',
+        'founding_lp',
         'founding_lp_w',
         'founding_lp_w_red',
+        'founding_vp',
         'founding_vp_w',
         'founding_vp_w_red',
         'current_pr_sdg_similarity',
         'current_pr_w_sdg_similarity',
         'current_pr_w_red_sdg_similarity',
+        'current_lp',
         'current_lp_w',
         'current_lp_w_red',
+        'current_vp',
         'current_vp_w',
         'current_vp_w_red',
+        'founding_core_diff_pca',
+        'current_core_diff_pca',
+        'founding_core_diff_w_pca',
+        'current_core_diff_w_pca',
         'founding_core_diff_w_red_pca',
         'current_core_diff_w_red_pca'
     ]
 
     pca = PCA(n_components=1)
-    mask = company_sample[['founding_lp_w_red', 'founding_vp_w_red']].notnull().all(axis=1)
-    company_sample.loc[mask, 'founding_core_diff_w_red_pca'] = pca.fit_transform(
-        company_sample.loc[mask, ['founding_lp_w_red', 'founding_vp_w_red']]
-    )
-
-    mask = company_sample[['current_lp_w_red', 'current_vp_w_red']].notnull().all(axis=1)
-    company_sample.loc[mask, 'current_core_diff_w_red_pca'] = pca.fit_transform(
-        company_sample.loc[mask, ['current_lp_w_red', 'current_vp_w_red']]
-    )
+    core_diff_cols = [
+        (['founding_lp', 'founding_vp'], 'founding_core_diff_pca'),
+        (['founding_lp_w', 'founding_vp_w'], 'founding_core_diff_w_pca'),
+        (['founding_lp_w_red', 'founding_vp_w_red'], 'founding_core_diff_w_red_pca'),
+        (['current_lp', 'current_vp'], 'current_core_diff_pca'),
+        (['current_lp_w', 'current_vp_w'], 'current_core_diff_w_pca'),
+        (['current_lp_w_red', 'current_vp_w_red'], 'current_core_diff_w_red_pca')
+    ]
+    for source_cols, target_col in core_diff_cols:
+        mask = company_sample[source_cols].notnull().all(axis=1)
+        company_sample.loc[mask, target_col] = pca.fit_transform(
+            company_sample.loc[mask, source_cols]
+        )
 
     scaler = StandardScaler()
     company_sample[score_cols + LOGREG_CONTINUOUS_FEATURES] = scaler.fit_transform(company_sample[score_cols + LOGREG_CONTINUOUS_FEATURES])
