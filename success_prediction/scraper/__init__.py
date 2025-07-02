@@ -1,2 +1,3 @@
-from scraper.serp_api import GoogleMapsScraper
-from scraper.website_scraper import CompanyWebCrawler
+from success_prediction.scraper.serp_api import GoogleMapsScraper
+from success_prediction.scraper.swissreg_api import SwissregCrawler
+from success_prediction.scraper.website_crawler import CompanyWebCrawler
