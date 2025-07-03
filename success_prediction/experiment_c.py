@@ -1,5 +1,5 @@
 """
-Experiment C: Performance difference between Doc2vec and my implementation
+Experiment C: Estimate predictive value of website features
 """
 import ast
 import warnings

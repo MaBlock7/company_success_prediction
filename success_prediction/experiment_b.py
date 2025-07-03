@@ -43,9 +43,6 @@ EXPERIMENT_SETUP = [
             ['current_core_diff_w_red_pca', 'current_pr_w_red_sdg_similarity']
         ],
     },
-]
-
-"""
     {
         'title': 'Year FEs',
         'targets': [
@@ -136,7 +133,8 @@ EXPERIMENT_SETUP = [
         ],
         'cat_controls': ['founding_year', 'division_1_label', 'canton_id'],
     },
-"""
+]
+
 
 def run_experiment():
 

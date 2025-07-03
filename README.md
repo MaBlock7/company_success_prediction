@@ -1,61 +1,12 @@
-# Text-based Company Success Prediction
+# Automated Venture Capitalist: Text-Based Prediction of Early-Stage Startup Success from Public Data
 
-<a target="_blank" href="https://cookiecutter-data-science.drivendata.org/">
-    <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
-</a>
+This repository contains the code for the master thesis "Automated Venture Capitalist: Text-Based Prediction of Early-Stage Startup Success from Public Data". The thesis aims to improve early-stage startup success prediction by combining administrative company data with website-derived strategic measures. I train binary classifiers to forecast four key startup outcomes within five years of founding:
 
-This project explores the usefulness of company website data to evaluate early startup success when only limited financial data is available.
+- Involuntary exit (e.g., bankruptcy or liquidation)
+- Acquisition by another firm
+- Private investment (e.g., IPOs, venture capital)
+- Innovation subsidies granted by Innosuisse, the Swiss innovation agency
 
-## Project Organization
+The dataset includes approximately 110,000 Swiss startups founded between 2016 and 2020. This work demonstrates how publicly available web and registry data can be used to build scoring models to support the screening of newly founded firms and show that founding strategy matters for the outcome prediction.
 
-```
-├── LICENSE            <- Open-source license if one is chosen
-├── Makefile           <- Makefile with convenience commands like `make data` or `make train`
-├── README.md          <- The top-level README for developers using this project.
-├── data
-│   ├── external       <- Data from third party sources.
-│   ├── interim        <- Intermediate data that has been transformed.
-│   ├── processed      <- The final, canonical data sets for modeling.
-│   └── raw            <- The original, immutable data dump.
-│
-├── docs               <- A default mkdocs project; see www.mkdocs.org for details
-│
-├── models             <- Trained and serialized models, model predictions, or model summaries
-│
-├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-│                         the creator's initials, and a short `-` delimited description, e.g.
-│                         `1.0-jqp-initial-data-exploration`.
-│
-├── pyproject.toml     <- Project configuration file with package metadata for 
-│                         text_based_company_success_prediction and configuration for tools like black
-│
-├── references         <- Data dictionaries, manuals, and all other explanatory materials.
-│
-├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
-│   └── figures        <- Generated graphics and figures to be used in reporting
-│
-├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
-│                         generated with `pip freeze > requirements.txt`
-│
-├── setup.cfg          <- Configuration file for flake8
-│
-└── src   <- Source code for use in this project.
-    │
-    ├── __init__.py             <- Makes text_based_company_success_prediction a Python module
-    │
-    ├── config.py               <- Store useful variables and configuration
-    │
-    ├── dataset.py              <- Scripts to download or generate data
-    │
-    ├── features.py             <- Code to create features for modeling
-    │
-    ├── modeling                
-    │   ├── __init__.py 
-    │   ├── predict.py          <- Code to run model inference with trained models          
-    │   └── train.py            <- Code to train models
-    │
-    └── plots.py                <- Code to create visualizations
-```
-
---------
-
+<img src="reports/figures/data_souces.png" alt="Logo" style="background-color: white; padding: 10px;">
