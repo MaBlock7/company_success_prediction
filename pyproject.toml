@@ -16,6 +16,45 @@ classifiers = [
     "License :: OSI Approved :: MIT License"
 ]
 requires-python = "~=3.12"
+dependencies = [
+  "black>=25.1.0,<26.0.0",
+  "crawl4ai>=0.7.0,<0.8.0",
+  "fasttext-langdetect>=1.0.5,<2.0.0",
+  "flake8>=7.3.0,<8.0.0",
+  "ftfy>=6.3.1,<7.0.0",
+  "gensim>=4.3.3,<5.0.0",
+  "geopy>=2.4.1,<3.0.0",
+  "html5lib>=1.1,<2.0",
+  "ipython>=9.4.0,<10.0.0",
+  "isort>=6.0.1,<7.0.0",
+  "jarowinkler>=2.0.1,<3.0.0",
+  "jupyterlab>=4.4.4,<5.0.0",
+  "langchain>=0.3.26,<0.4.0",
+  "langchain-huggingface>=0.3.0,<0.4.0",
+  "loguru>=0.7.3,<0.8.0",
+  "matplotlib>=3.10.3,<4.0.0",
+  "mkdocs>=1.6.1,<2.0.0",
+  "nltk>=3.9.1,<4.0.0",
+  "notebook>=7.4.4,<8.0.0",
+  "numpy>=2.3.1,<3.0.0",
+  "optuna>=4.4.0,<5.0.0",
+  "pandas>=2.3.1,<3.0.0",
+  "playwright>=1.53.0,<2.0.0",
+  "pymilvus>=2.5.12,<3.0.0",
+  "python-dotenv>=1.1.1,<2.0.0",
+  "scikit-learn>=1.7.0,<2.0.0",
+  "seaborn>=0.13.2,<0.14.0",
+  "selenium>=4.34.2,<5.0.0",
+  "sentence-transformers>=5.0.0,<6.0.0",
+  "statsmodels>=0.14.5,<0.15.0",
+  "tqdm>=4.67.1,<5.0.0",
+  "torch>=2.7.1,<3.0.0",
+  "transformers>=4.53.2,<5.0.0",
+  "typer>=0.16.0,<0.17.0",
+  "wayback>=0.4.5,<0.5.0",
+  "xgboost>=3.0.2,<4.0.0",
+  "pocketknife @ git+https://github.com/ChironServices/pocket-knife.git@07cc858b9803328affca0d26c364d001edff4168"
+]
 
 [tool.black]
 line-length = 99

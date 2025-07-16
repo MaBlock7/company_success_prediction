@@ -13,7 +13,7 @@ from modelling.regression_analysis import CoefficientAnalyser
 from modelling.logreg_config import (
     LOGREG_BINARY_FEATURES, LOGREG_CONTINUOUS_FEATURES,
 )
-from config import RAW_DATA_DIR, MODELS_DIR
+from config import PROCESSED_DATA_DIR, MODELS_DIR
 
 
 # Global params
@@ -138,7 +138,7 @@ EXPERIMENT_SETUP = [
 
 def run_experiment():
 
-    company_sample = pd.read_csv(RAW_DATA_DIR / 'company_sample' / 'until_2020' / '2020_sample_encoded_features.csv')
+    company_sample = pd.read_csv(PROCESSED_DATA_DIR / 'company_sample' / 'until_2020' / '2020_sample_encoded_features.csv')
 
     # Drop the row with missing firm name length
     company_sample = company_sample[company_sample['firm_name_length'].notna()]

@@ -4,12 +4,10 @@ import argparse
 from dataclasses import dataclass
 from pathlib import Path
 from tqdm import tqdm
-
 from ftlangdetect import detect
 from pymilvus import MilvusClient, CollectionSchema, FieldSchema, DataType
 from rag_components.embeddings import Doc2VecHandler
 from rag_components.cleanup import MarkdownCleaner
-
 from config import DATA_DIR, RAW_DATA_DIR, MODELS_DIR
 
 

@@ -5,9 +5,7 @@ import ast
 import warnings
 import numpy as np
 import pandas as pd
-
 from scipy.stats import t, ttest_1samp
-
 import optuna
 from optuna.distributions import IntDistribution, FloatDistribution
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
@@ -21,7 +19,7 @@ from modelling.xgb_config import (
     XGB_BINARY_FEATURES, XGB_CONTINUOUS_FEATURES,
     XGB_HIGH_CAT_FEATURES, XGB_LOW_CAT_FEATURES
 )
-from config import RAW_DATA_DIR, MODELS_DIR
+from config import PROCESSED_DATA_DIR, MODELS_DIR
 
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn.preprocessing._encoders")
 warnings.filterwarnings("ignore", category=optuna.exceptions.ExperimentalWarning)
@@ -200,7 +198,7 @@ def create_average_significance_report():
 
 def run_experiment():
     # Load data sample
-    company_sample = pd.read_csv(RAW_DATA_DIR / 'company_sample' / 'until_2020' / '2020_sample_encoded_features.csv')
+    company_sample = pd.read_csv(PROCESSED_DATA_DIR / 'company_sample' / 'until_2020' / '2020_sample_encoded_features.csv')
 
     # Drop the row with missing firm name length
     company_sample = company_sample[company_sample['firm_name_length'].notna()]

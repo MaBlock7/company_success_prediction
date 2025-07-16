@@ -3,17 +3,13 @@ Experiment A: Performance difference between different model types on baseline f
 """
 import warnings
 import pandas as pd
-
 import optuna
 from optuna.distributions import IntDistribution, FloatDistribution, CategoricalDistribution
-
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, OrdinalEncoder
-
 from xgboost import XGBClassifier
-
 from success_prediction.modelling.config import (
     ALL_BINARY_FEATURE_COLS, ALL_CATEGORICAL_FEATURE_COLS, ALL_CONTINUOUS_FEATURE_COLS,
     FOUNDING_WEBSITE_FEATURE_COLS, CURRENT_WEBSITE_FEATURE_COLS, TARGET_COLS
@@ -31,7 +27,7 @@ from modelling.xgb_config import (
     XGB_BINARY_FEATURES, XGB_CONTINUOUS_FEATURES,
     XGB_HIGH_CAT_FEATURES, XGB_LOW_CAT_FEATURES
 )
-from success_prediction.config import RAW_DATA_DIR, MODELS_DIR
+from success_prediction.config import PROCESSED_DATA_DIR, MODELS_DIR
 
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn.preprocessing._encoders")
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
@@ -168,7 +164,7 @@ MODEL_SPECS = {
 
 def run_experiment():
     # Load data sample
-    company_sample = pd.read_csv(RAW_DATA_DIR / 'company_sample' / 'until_2020' / '2020_sample_encoded_features.csv')
+    company_sample = pd.read_csv(PROCESSED_DATA_DIR / 'company_sample' / 'until_2020' / '2020_sample_encoded_features.csv')
 
     # Drop the row with missing firm name length
     company_sample = company_sample[company_sample['firm_name_length'].notna()]

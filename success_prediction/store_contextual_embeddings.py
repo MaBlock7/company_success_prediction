@@ -4,7 +4,6 @@ import argparse
 from dataclasses import dataclass
 from pathlib import Path
 from tqdm import tqdm
-
 from ftlangdetect import detect
 from pymilvus import MilvusClient, CollectionSchema, FieldSchema, DataType
 from rag_components.embeddings import EmbeddingHandler

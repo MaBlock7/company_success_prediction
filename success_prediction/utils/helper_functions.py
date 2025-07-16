@@ -19,6 +19,7 @@ def cosine_sim(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     else:
         raise ValueError(f"Incompatible shapes: a.shape={a.shape}, b.shape={b.shape}")
 
+
 def angular_distance_from_cosine(cos_sim: np.ndarray) -> np.ndarray:
     """
     Convert cosine similarity values to angular distance in [0, 1].
