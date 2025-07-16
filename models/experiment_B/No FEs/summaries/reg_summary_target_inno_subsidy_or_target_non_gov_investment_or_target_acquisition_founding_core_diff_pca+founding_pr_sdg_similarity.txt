@@ -1,0 +1,16 @@
+                                                     Logit Regression Results                                                     
+==================================================================================================================================
+Dep. Variable:     target_inno_subsidy_or_target_non_gov_investment_or_target_acquisition   No. Observations:                39926
+Model:                                                                              Logit   Df Residuals:                    39923
+Method:                                                                               MLE   Df Model:                            2
+Date:                                                                    Mon, 30 Jun 2025   Pseudo R-squ.:                0.003738
+Time:                                                                            11:27:11   Log-Likelihood:                -4583.8
+converged:                                                                           True   LL-Null:                       -4601.0
+Covariance Type:                                                                      HC1   LLR p-value:                 3.398e-08
+==============================================================================================
+                                 coef    std err          z      P>|z|      [0.025      0.975]
+----------------------------------------------------------------------------------------------
+Intercept                     -3.6968      0.033   -113.248      0.000      -3.761      -3.633
+founding_core_diff_pca         0.1103      0.019      5.943      0.000       0.074       0.147
+founding_pr_sdg_similarity     0.1968      0.040      4.911      0.000       0.118       0.275
+==============================================================================================
