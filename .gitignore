@@ -5,6 +5,8 @@
 /data/raw/company_urls/*
 /data/raw/company_sample/*
 
+# Models
+/models/doc2vec/*
 # Mac OS-specific storage files
 .DS_Store
 
