@@ -1,3 +1,4 @@
+import json
 import joblib
 import pickle
 from collections import Counter
@@ -145,6 +146,35 @@ class ModelEvaluation:
         else:
             return None
 
+    def _get_transformed_feature_names(
+        self,
+        preprocessor: ColumnTransformer,
+        input_features: list,
+        out_folder: Path,
+        model_name: str,
+        target: str
+    ) -> None:
+        """Return feature names after a ColumnTransformer fit, including passthroughs."""
+        names = []
+        for name, trans, cols in preprocessor.transformers_:
+            if trans == 'drop':
+                continue
+            if trans == 'passthrough':
+                # cols: list of column names, a slice, or mask
+                if isinstance(cols, (list, tuple, np.ndarray)):
+                    names.extend(cols)
+                elif isinstance(cols, slice):
+                    names.extend(input_features[cols])
+                else:
+                    raise ValueError(f"Unexpected cols type: {type(cols)}")
+            else:
+                names.extend(trans.get_feature_names_out(cols))
+
+        feature_names_path = out_folder / f'{model_name}_{target}_encoded_feature_names.json'
+        with open(feature_names_path, 'w', encoding='utf-8') as f:
+            json.dump(list(names), f, ensure_ascii=False, indent=2)
+        print(f"Saved encoded feature names to {feature_names_path}")
+
     def _add_class_weights_to_fit_params(
         self,
         fit_params: dict,
@@ -207,6 +237,7 @@ class ModelEvaluation:
 
     def nested_cv_with_feature_selection(
         self,
+        out_folder: Path,
         k_outer: int = 5,
         k_inner: int = 3,
         min_features_to_select: int = 10,
@@ -222,6 +253,7 @@ class ModelEvaluation:
             scoring: Scoring metric for RFECV.
         """
         print("Starting nested CV with feature selection...")
+        out_folder.mkdir(parents=True, exist_ok=True)
 
         for model_name, spec in tqdm(self.model_specs.items(), desc="Models"):
 
@@ -290,6 +322,8 @@ class ModelEvaluation:
             n_trials: Number of Optuna trials (if using Optuna).
             scoring: Scoring metric for model selection.
         """
+        out_folder.mkdir(parents=True, exist_ok=True)
+
         if best_features and not self.selected_features:
             raise ValueError('To use the best features execure find_best_feature_subset first!')
 
@@ -397,6 +431,13 @@ class ModelEvaluation:
                 production_model = ModelClass(**best_params)
 
                 X_proc = preprocessor.fit_transform(X)
+                self._get_transformed_feature_names(
+                    preprocessor,
+                    list(X.columns),
+                    out_folder,
+                    model_name,
+                    target
+                )
                 production_model.fit(X_proc, y)
 
                 # Store production model
@@ -419,7 +460,6 @@ class ModelEvaluation:
                     'best_params': overall_lambda_star,
                 }
                 print(f"[FINISHED] Model: {model_name} | Target: {target} | Mean ROC-AUC: {np.mean(outer_metrics['roc_auc']):.4f} | Mean PR-AUC: {np.mean(outer_metrics['pr_auc']):.4f}")
-
         self._save_models_and_reports(out_folder)
 
     def _save_models_and_reports(self, out_folder: Path) -> None:
@@ -429,8 +469,6 @@ class ModelEvaluation:
         Args:
             out_folder: Output folder path.
         """
-        out_folder.mkdir(parents=True, exist_ok=True)
-
         # Save best models stored in self.best_models[model_name][target]
         models_dir = out_folder / 'trained_models'
         models_dir.mkdir(exist_ok=True)

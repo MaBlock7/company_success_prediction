@@ -12,7 +12,7 @@ import optuna
 from optuna.distributions import IntDistribution, FloatDistribution
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
 from xgboost import XGBClassifier
-from success_prediction.modelling.config import (
+from modelling.config import (
     ALL_BINARY_FEATURE_COLS, ALL_CATEGORICAL_FEATURE_COLS, ALL_CONTINUOUS_FEATURE_COLS,
     FOUNDING_WEBSITE_FEATURE_COLS, CURRENT_WEBSITE_FEATURE_COLS, TARGET_COLS
 )
@@ -21,7 +21,7 @@ from modelling.xgb_config import (
     XGB_BINARY_FEATURES, XGB_CONTINUOUS_FEATURES,
     XGB_HIGH_CAT_FEATURES, XGB_LOW_CAT_FEATURES
 )
-from success_prediction.config import RAW_DATA_DIR, MODELS_DIR
+from config import RAW_DATA_DIR, MODELS_DIR
 
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn.preprocessing._encoders")
 warnings.filterwarnings("ignore", category=optuna.exceptions.ExperimentalWarning)
