@@ -1,5 +1,8 @@
 # Data
 /data/database/*
+/data/processed/company_sample/*
+/data/processed/website_scores/*
+/data/raw/company_websites/wayback/*
 /data/raw/company_websites/current/*
 /data/raw/company_websites/wayback/*
 /data/raw/company_urls/*
@@ -8,6 +11,7 @@
 # Models
 /models/doc2vec/*
 /models/*/trained_models/*
+
 # Mac OS-specific storage files
 .DS_Store
 
