@@ -24,6 +24,7 @@ class CoefficientAnalyser:
             random_state: Random seed for reproducibility.
         """
         self.df = df
+        self.df.columns = [col.replace('.', '_').replace('-', '_') for col in self.df.columns]
         self.experiment_dir = Path(experiment_dir)
         self.experiment_dir.mkdir(exist_ok=True, parents=True)
         self.maxiter = maxiter

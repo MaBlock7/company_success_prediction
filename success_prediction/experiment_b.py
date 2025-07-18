@@ -20,7 +20,7 @@ from config import PROCESSED_DATA_DIR, MODELS_DIR
 RANDOM_STATE = 42
 WEBSITE_FEATURE_COLS = FOUNDING_WEBSITE_FEATURE_COLS + CURRENT_WEBSITE_FEATURE_COLS
 
-CAT_CONTROLS = ['founding_legal_form', 'division_1_label', 'typology_9c', 'canton_id', 'bps_length_quantiles_5', 'founding_year']
+CAT_CONTROLS = ['founding_year', 'section_1_label', 'urban_rural', 'bps_length_quantiles_5']
 OTHER_CONTROLS = [c for c in LOGREG_BINARY_FEATURES + LOGREG_CONTINUOUS_FEATURES if c not in CURRENT_WEBSITE_FEATURE_COLS + FOUNDING_WEBSITE_FEATURE_COLS]
 
 EXPERIMENT_SETUP = [
@@ -138,7 +138,7 @@ EXPERIMENT_SETUP = [
 
 def run_experiment():
 
-    company_sample = pd.read_csv(PROCESSED_DATA_DIR / 'company_sample' / 'until_2020' / '2020_sample_encoded_features.csv')
+    company_sample = pd.read_csv(PROCESSED_DATA_DIR / 'company_sample' / '2020_sample_encoded_features.csv')
 
     # Drop the row with missing firm name length
     company_sample = company_sample[company_sample['firm_name_length'].notna()]

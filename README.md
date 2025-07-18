@@ -27,8 +27,8 @@ The dataset includes approximately 110,000 Swiss startups founded between 2016 a
     - Stores trained models, hyperparameter and evaluation metrics reports.
 - **notebooks/**
     - **one-off analyses/**: Summary statistics for thesis and data preparation.
-- **reports/**
-    - **figures/**: Figures from the thesis / summary_statistics.ipynb.
+- **figures/**
+    - Stores figures from the thesis / summary_statistics.ipynb.
 - **success_prediction/**
     - Source code for crawling, feature engineering, training, and evaluating models.
     - Main score calculation script: **run_create_embedding_scores.sh**

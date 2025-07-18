@@ -198,7 +198,7 @@ def create_average_significance_report():
 
 def run_experiment():
     # Load data sample
-    company_sample = pd.read_csv(PROCESSED_DATA_DIR / 'company_sample' / 'until_2020' / '2020_sample_encoded_features.csv')
+    company_sample = pd.read_csv(PROCESSED_DATA_DIR / 'company_sample' / '2020_sample_encoded_features.csv')
 
     # Drop the row with missing firm name length
     company_sample = company_sample[company_sample['firm_name_length'].notna()]
